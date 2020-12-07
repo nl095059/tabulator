@@ -1,6 +1,9 @@
 *.sublime-project
 *.sublime-workspace
-
+*.map
+coverage/
+dist/
+dist/css/
 node_modules/
 examples/
 npm-debug.log
