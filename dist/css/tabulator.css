@@ -1,4 +1,5 @@
 /* Tabulator v4.9.1 (c) Oliver Folkerd */
+/* Table selection */
 .tabulator {
   position: relative;
   border: 1px solid #999;
@@ -723,6 +724,26 @@
   height: 14px;
   width: 14px;
   border-radius: 14px;
+}
+
+.tabulator-row .tabulator-cell.selection-top {
+  border-top: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.selection-left {
+  border-left: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.selection-right {
+  border-right: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.selection-bottom {
+  border-bottom: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.tabulator-selected {
+  background-color: #9ABCEA;
 }
 
 .tabulator-row.tabulator-group {

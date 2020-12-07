@@ -64,23 +64,22 @@ function highlightCells(table, start, end) {
 
             if (rowIndex >= coords.startRow && rowIndex <= coords.endRow) {
 
-                var cellClassList = cell.getElement().classList;
                 if (!(rowIndex == start.row && x == start.col)) {
-                    cellClassList.add(CELL_SELECTED_CLASS);
+                    cell.getElement().classList.add(CELL_SELECTED_CLASS);
                 }
 
                 if (x == coords.startCol) {
-                    cellClassList.add(SELECTION_LEFT_CLASS);
+                    cell.getElement().classList.add(SELECTION_LEFT_CLASS);
                 }
                 if (x == coords.endCol) {
-                    cellClassList.add(SELECTION_RIGHT_CLASS);
+                    cell.getElement().classList.add(SELECTION_RIGHT_CLASS);
                 }
 
                 if (rowIndex == coords.startRow) {
-                    cellClassList.add(SELECTION_TOP_CLASS);
+                    cell.getElement().classList.add(SELECTION_TOP_CLASS);
                 }
                 if (rowIndex == coords.endRow) {
-                    cellClassList.add(SELECTION_BOTTOM_CLASS);
+                    cell.getElement().classList.add(SELECTION_BOTTOM_CLASS);
                 }
 
                 cells.push(cell);

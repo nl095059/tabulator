@@ -37,7 +37,7 @@ Clipboard.prototype.initialize = function () {
 
 					var list = _this.table.modules.export.generateExportList(_this.table.options.clipboardCopyConfig, _this.table.options.clipboardCopyStyled, _this.rowRange, "clipboard");
 
-					html = _this.table.modules.export.genereateHTMLTable(list);
+					html = _this.table.modules.export.generateHTMLTable(list);
 					plain = html ? _this.generatePlainContent(list) : "";
 
 					if (_this.table.options.clipboardCopyFormatter) {
@@ -196,7 +196,7 @@ Clipboard.prototype.setPasteParser = function (parser) {
 Clipboard.prototype.paste = function (e) {
 	var data, rowData, rows;
 
-	if (this.checkPaseOrigin(e)) {
+	if (this.checkPasteOrigin(e)) {
 
 		data = this.getPasteData(e);
 
@@ -232,7 +232,7 @@ Clipboard.prototype.mutateData = function (data) {
 	return output;
 };
 
-Clipboard.prototype.checkPaseOrigin = function (e) {
+Clipboard.prototype.checkPasteOrigin = function (e) {
 	var valid = true;
 
 	if (e.target.tagName != "DIV" || this.table.modules.edit.currentCell) {

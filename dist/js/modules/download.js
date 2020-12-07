@@ -424,7 +424,7 @@ Download.prototype.downloaders = {
 
 	html: function html(list, options, setFileContents) {
 		if (this.modExists("export", true)) {
-			setFileContents(this.modules.export.genereateHTMLTable(list), "text/html");
+			setFileContents(this.modules.export.generateHTMLTable(list), "text/html");
 		}
 	}
 

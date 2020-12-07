@@ -4921,7 +4921,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		this.createElement();
 
 		//set row selection characteristics
-		if (self.table.options.selectable !== false && self.table.modExists("selectRow")) {
+		if (self.table.options.selectable !== false && self.table.options.selectionType === 'row' && self.table.modExists("selectRow")) {
 			self.table.modules.selectRow.initializeRow(this);
 		}
 
@@ -5800,6 +5800,12 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			self.table.modules.moveRow.initializeCell(self);
 		}
 
+		if (self.table.options.selectable !== false) {
+			if (self.table.options.selectionType === 'cell' && self.table.modExists('selectCell')) {
+				self.table.modules.selectCell.initializeCell(this);
+			}
+		}
+
 		//hide cell if not visible
 		if (!self.column.visible) {
 			self.hide();
@@ -6674,6 +6680,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		selectableCheck: function selectableCheck(data, row) {
 			return true;
 		}, //check wheather row is selectable
+		selectionType: "row",
 
 		headerFilterLiveFilterDelay: 300, //delay before updating column after user types in header filter
 		headerFilterPlaceholder: false, //placeholder text to display in header filters
@@ -10463,7 +10470,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 						var list = _this46.table.modules.export.generateExportList(_this46.table.options.clipboardCopyConfig, _this46.table.options.clipboardCopyStyled, _this46.rowRange, "clipboard");
 
-						html = _this46.table.modules.export.genereateHTMLTable(list);
+						html = _this46.table.modules.export.generateHTMLTable(list);
 						plain = html ? _this46.generatePlainContent(list) : "";
 
 						if (_this46.table.options.clipboardCopyFormatter) {
@@ -10622,7 +10629,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	Clipboard.prototype.paste = function (e) {
 		var data, rowData, rows;
 
-		if (this.checkPaseOrigin(e)) {
+		if (this.checkPasteOrigin(e)) {
 
 			data = this.getPasteData(e);
 
@@ -10658,7 +10665,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return output;
 	};
 
-	Clipboard.prototype.checkPaseOrigin = function (e) {
+	Clipboard.prototype.checkPasteOrigin = function (e) {
 		var valid = true;
 
 		if (e.target.tagName != "DIV" || this.table.modules.edit.currentCell) {
@@ -11708,7 +11715,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 		html: function html(list, options, setFileContents) {
 			if (this.modExists("export", true)) {
-				setFileContents(this.modules.export.genereateHTMLTable(list), "text/html");
+				setFileContents(this.modules.export.generateHTMLTable(list), "text/html");
 			}
 		}
 
@@ -14009,10 +14016,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return headers.concat(body);
 	};
 
-	Export.prototype.genereateTable = function (config, style, range, colVisProp) {
+	Export.prototype.generateTable = function (config, style, range, colVisProp) {
 		var list = this.generateExportList(config, style, range, colVisProp);
 
-		return this.genereateTableElement(list);
+		return this.generateTableElement(list);
 	};
 
 	Export.prototype.rowLookup = function (range) {
@@ -14040,7 +14047,12 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					break;
 
 				case "selected":
-					rows = this.table.modules.selectRow.selectedRows;
+					var selectionType = this.table.options.selectionType;
+					if (selectionType === 'row') {
+						rows = this.table.modules.selectRow.selectedRows;
+					} else if (selectionType === 'cell') {
+						rows = this.table.modules.selectCell.selectedRows;
+					}
 					break;
 
 				case "active":
@@ -14061,7 +14073,15 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 		var output = [];
 
-		var columns = this.config.columnGroups !== false ? this.table.columnManager.columns : this.table.columnManager.columnsByIndex;
+		var columns;
+
+		if (this.table.options.selectionType === 'cell' && this.table.modExists('selectCell')) {
+			columns = this.getSelectedColumns().map(function (component) {
+				return component._column;
+			});
+		} else {
+			columns = this.config.columnGroups !== false ? this.table.columnManager.columns : this.table.columnManager.columnsByIndex;
+		}
 
 		columns.forEach(function (column) {
 			var colData = _this56.processColumnGroup(column);
@@ -14193,17 +14213,27 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return exportRows;
 	};
 
-	Export.prototype.bodyToExportRows = function (rows) {
+	Export.prototype.getSelectedColumns = function () {
 		var _this58 = this;
 
-		var columns = [];
-		var exportRows = [];
+		if (this.table.options.selectionType === 'cell' && this.table.modExists('selectCell')) {
+			return this.table.modules.selectCell.getSelectedColumns();
+		} else {
+			var columns = [];
+			this.table.columnManager.columnsByIndex.forEach(function (column) {
+				if (_this58.columnVisCheck(column)) {
+					columns.push(column.getComponent());
+				}
+			});
+			return columns;
+		}
+	};
 
-		this.table.columnManager.columnsByIndex.forEach(function (column) {
-			if (_this58.columnVisCheck(column)) {
-				columns.push(column.getComponent());
-			}
-		});
+	Export.prototype.bodyToExportRows = function (rows) {
+		var _this59 = this;
+
+		var columns = this.getSelectedColumns();
+		var exportRows = [];
 
 		if (this.config.columnCalcs !== false && this.table.modExists("columnCalcs")) {
 			if (this.table.modules.columnCalcs.topInitialized) {
@@ -14218,15 +14248,15 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		rows = rows.filter(function (row) {
 			switch (row.type) {
 				case "group":
-					return _this58.config.rowGroups !== false;
+					return _this59.config.rowGroups !== false;
 					break;
 
 				case "calc":
-					return _this58.config.columnCalcs !== false;
+					return _this59.config.columnCalcs !== false;
 					break;
 
 				case "row":
-					return !(_this58.table.options.dataTree && _this58.config.dataTree === false && row.modules.dataTree.parent);
+					return !(_this59.table.options.dataTree && _this59.config.dataTree === false && row.modules.dataTree.parent);
 					break;
 			}
 
@@ -14234,7 +14264,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		});
 
 		rows.forEach(function (row, i) {
-			var rowData = row.getData(_this58.colVisProp);
+			var rowData = row.getData(_this59.colVisProp);
 			var exportCols = [];
 			var indent = 0;
 
@@ -14250,7 +14280,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 						exportCols.push(new ExportColumn(col._column.getFieldValue(rowData), col, 1, 1));
 					});
 
-					if (_this58.table.options.dataTree && _this58.config.dataTree !== false) {
+					if (_this59.table.options.dataTree && _this59.config.dataTree !== false) {
 						indent = row.modules.dataTree.index;
 					}
 					break;
@@ -14262,8 +14292,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return exportRows;
 	};
 
-	Export.prototype.genereateTableElement = function (list) {
-		var _this59 = this;
+	Export.prototype.generateTableElement = function (list) {
+		var _this60 = this;
 
 		var table = document.createElement("table"),
 		    headerEl = document.createElement("thead"),
@@ -14296,20 +14326,20 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		list.forEach(function (row, i) {
 			switch (row.type) {
 				case "header":
-					headerEl.appendChild(_this59.genereateHeaderElement(row, setup, styles));
+					headerEl.appendChild(_this60.generateHeaderElement(row, setup, styles));
 					break;
 
 				case "group":
-					bodyEl.appendChild(_this59.genereateGroupElement(row, setup, styles));
+					bodyEl.appendChild(_this60.generateGroupElement(row, setup, styles));
 					break;
 
 				case "calc":
-					bodyEl.appendChild(_this59.genereateCalcElement(row, setup, styles));
+					bodyEl.appendChild(_this60.generateCalcElement(row, setup, styles));
 					break;
 
 				case "row":
-					var rowEl = _this59.genereateRowElement(row, setup, styles);
-					_this59.mapElementStyles(i % 2 && styles.evenRow ? styles.evenRow : styles.oddRow, rowEl, ["border-top", "border-left", "border-right", "border-bottom", "color", "font-weight", "font-family", "font-size", "background-color"]);
+					var rowEl = _this60.generateRowElement(row, setup, styles);
+					_this60.mapElementStyles(i % 2 && styles.evenRow ? styles.evenRow : styles.oddRow, rowEl, ["border-top", "border-left", "border-right", "border-bottom", "color", "font-weight", "font-family", "font-size", "background-color"]);
 					bodyEl.appendChild(rowEl);
 					break;
 			}
@@ -14346,8 +14376,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return styles;
 	};
 
-	Export.prototype.genereateHeaderElement = function (row, setup, styles) {
-		var _this60 = this;
+	Export.prototype.generateHeaderElement = function (row, setup, styles) {
+		var _this61 = this;
 
 		var rowEl = document.createElement("tr");
 
@@ -14361,7 +14391,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 				cellEl.innerHTML = column.value;
 
-				if (_this60.cloneTableStyle) {
+				if (_this61.cloneTableStyle) {
 					cellEl.style.boxSizing = "border-box";
 				}
 
@@ -14369,11 +14399,11 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					cellEl.classList.add(className);
 				});
 
-				_this60.mapElementStyles(column.component.getElement(), cellEl, ["text-align", "border-top", "border-left", "border-right", "border-bottom", "background-color", "color", "font-weight", "font-family", "font-size"]);
-				_this60.mapElementStyles(column.component._column.contentElement, cellEl, ["padding-top", "padding-left", "padding-right", "padding-bottom"]);
+				_this61.mapElementStyles(column.component.getElement(), cellEl, ["text-align", "border-top", "border-left", "border-right", "border-bottom", "background-color", "color", "font-weight", "font-family", "font-size"]);
+				_this61.mapElementStyles(column.component._column.contentElement, cellEl, ["padding-top", "padding-left", "padding-right", "padding-bottom"]);
 
 				if (column.component._column.visible) {
-					_this60.mapElementStyles(column.component.getElement(), cellEl, ["width"]);
+					_this61.mapElementStyles(column.component.getElement(), cellEl, ["width"]);
 				} else {
 					if (column.component._column.definition.width) {
 						cellEl.style.width = column.component._column.definition.width + "px";
@@ -14381,7 +14411,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				}
 
 				if (column.component._column.parent) {
-					_this60.mapElementStyles(column.component._column.parent.groupElement, cellEl, ["border-top"]);
+					_this61.mapElementStyles(column.component._column.parent.groupElement, cellEl, ["border-top"]);
 				}
 
 				rowEl.appendChild(cellEl);
@@ -14391,7 +14421,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return rowEl;
 	};
 
-	Export.prototype.genereateGroupElement = function (row, setup, styles) {
+	Export.prototype.generateGroupElement = function (row, setup, styles) {
 
 		var rowEl = document.createElement("tr"),
 		    cellEl = document.createElement("td"),
@@ -14427,8 +14457,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return rowEl;
 	};
 
-	Export.prototype.genereateCalcElement = function (row, setup, styles) {
-		var rowEl = this.genereateRowElement(row, setup, styles);
+	Export.prototype.generateCalcElement = function (row, setup, styles) {
+		var rowEl = this.generateRowElement(row, setup, styles);
 
 		rowEl.classList.add("tabulator-print-table-calcs");
 		this.mapElementStyles(styles.calcRow, rowEl, ["border-top", "border-left", "border-right", "border-bottom", "color", "font-weight", "font-family", "font-size", "background-color"]);
@@ -14436,8 +14466,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return rowEl;
 	};
 
-	Export.prototype.genereateRowElement = function (row, setup, styles) {
-		var _this61 = this;
+	Export.prototype.generateRowElement = function (row, setup, styles) {
+		var _this62 = this;
 
 		var rowEl = document.createElement("tr");
 
@@ -14482,8 +14512,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					cellEl.classList.add(className);
 				});
 
-				if (_this61.table.modExists("format") && _this61.config.formatCells !== false) {
-					value = _this61.table.modules.format.formatExportValue(cellWrapper, _this61.colVisProp);
+				if (_this62.table.modExists("format") && _this62.config.formatCells !== false) {
+					value = _this62.table.modules.format.formatExportValue(cellWrapper, _this62.colVisProp);
 				} else {
 					switch (typeof value === 'undefined' ? 'undefined' : _typeof(value)) {
 						case "object":
@@ -14507,14 +14537,14 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				}
 
 				if (styles.firstCell) {
-					_this61.mapElementStyles(styles.firstCell, cellEl, ["padding-top", "padding-left", "padding-right", "padding-bottom", "border-top", "border-left", "border-right", "border-bottom", "color", "font-weight", "font-family", "font-size"]);
+					_this62.mapElementStyles(styles.firstCell, cellEl, ["padding-top", "padding-left", "padding-right", "padding-bottom", "border-top", "border-left", "border-right", "border-bottom", "color", "font-weight", "font-family", "font-size"]);
 
 					if (column.definition.align) {
 						cellEl.style.textAlign = column.definition.align;
 					}
 				}
 
-				if (_this61.table.options.dataTree && _this61.config.dataTree !== false) {
+				if (_this62.table.options.dataTree && _this62.config.dataTree !== false) {
 					if (setup.treeElementField && setup.treeElementField == column.field || !setup.treeElementField && i == 0) {
 						if (row.component._row.modules.dataTree.controlEl) {
 							cellEl.insertBefore(row.component._row.modules.dataTree.controlEl.cloneNode(true), cellEl.firstChild);
@@ -14531,7 +14561,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					cellWrapper.modules.format.renderedCallback();
 				}
 
-				if (setup.rowFormatter && _this61.config.formatCells !== false) {
+				if (setup.rowFormatter && _this62.config.formatCells !== false) {
 					setup.rowFormatter(row.component);
 				}
 			}
@@ -14540,10 +14570,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		return rowEl;
 	};
 
-	Export.prototype.genereateHTMLTable = function (list) {
+	Export.prototype.generateHTMLTable = function (list) {
 		var holder = document.createElement("div");
 
-		holder.appendChild(this.genereateTableElement(list));
+		holder.appendChild(this.generateTableElement(list));
 
 		return holder.innerHTML;
 	};
@@ -14551,7 +14581,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	Export.prototype.getHtml = function (visible, style, config, colVisProp) {
 		var list = this.generateExportList(config || this.table.options.htmlOutputConfig, style, visible, colVisProp || "htmlOutput");
 
-		return this.genereateHTMLTable(list);
+		return this.generateHTMLTable(list);
 	};
 
 	Export.prototype.mapElementStyles = function (from, to, props) {
@@ -14704,7 +14734,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Filter.prototype.generateHeaderFilterElement = function (column, initialValue, reinitialize) {
-		var _this62 = this;
+		var _this63 = this;
 
 		var self = this,
 		    success = column.modules.filter.success,
@@ -14829,11 +14859,11 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				});
 
 				editorElement.addEventListener("focus", function (e) {
-					var left = _this62.table.columnManager.element.scrollLeft;
+					var left = _this63.table.columnManager.element.scrollLeft;
 
-					if (left !== _this62.table.rowManager.element.scrollLeft) {
-						_this62.table.rowManager.scrollHorizontal(left);
-						_this62.table.columnManager.scrollHorizontal(left);
+					if (left !== _this63.table.rowManager.element.scrollLeft) {
+						_this63.table.rowManager.scrollHorizontal(left);
+						_this63.table.columnManager.scrollHorizontal(left);
 					}
 				});
 
@@ -15074,7 +15104,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//filter to Object
 	Filter.prototype.filtersToArray = function (filterList, ajax) {
-		var _this63 = this;
+		var _this64 = this;
 
 		var output = [];
 
@@ -15082,7 +15112,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			var item;
 
 			if (Array.isArray(filter)) {
-				output.push(_this63.filtersToArray(filter, ajax));
+				output.push(_this64.filtersToArray(filter, ajax));
 			} else {
 				item = { field: filter.field, type: filter.type, value: filter.value };
 
@@ -16087,7 +16117,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		},
 
 		rowSelection: function rowSelection(cell, formatterParams, onRendered) {
-			var _this64 = this;
+			var _this65 = this;
 
 			var checkbox = document.createElement("input");
 
@@ -16115,10 +16145,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					}
 				} else {
 					checkbox.addEventListener("change", function (e) {
-						if (_this64.table.modules.selectRow.selectedRows.length) {
-							_this64.table.deselectRow();
+						if (_this65.table.modules.selectRow.selectedRows.length) {
+							_this65.table.deselectRow();
 						} else {
-							_this64.table.selectRow(formatterParams.rowRange);
+							_this65.table.selectRow(formatterParams.rowRange);
 						}
 					});
 
@@ -16200,7 +16230,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//quick layout to smooth horizontal scrolling
 	FrozenColumns.prototype.scrollHorizontal = function () {
-		var _this65 = this;
+		var _this66 = this;
 
 		var rows;
 
@@ -16209,7 +16239,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 			//layout all rows after scroll is complete
 			this.scrollEndTimer = setTimeout(function () {
-				_this65.layout();
+				_this66.layout();
 			}, 100);
 
 			rows = this.table.rowManager.getVisibleRows();
@@ -16222,7 +16252,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 			rows.forEach(function (row) {
 				if (row.type === "row") {
-					_this65.layoutRow(row);
+					_this66.layoutRow(row);
 				}
 			});
 
@@ -16256,23 +16286,23 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//calculate column positions and layout headers
 	FrozenColumns.prototype.layoutColumnPosition = function (allCells) {
-		var _this66 = this;
+		var _this67 = this;
 
 		var leftParents = [];
 
 		this.leftColumns.forEach(function (column, i) {
-			column.modules.frozen.margin = _this66._calcSpace(_this66.leftColumns, i) + _this66.table.columnManager.scrollLeft + "px";
+			column.modules.frozen.margin = _this67._calcSpace(_this67.leftColumns, i) + _this67.table.columnManager.scrollLeft + "px";
 
-			if (i == _this66.leftColumns.length - 1) {
+			if (i == _this67.leftColumns.length - 1) {
 				column.modules.frozen.edge = true;
 			} else {
 				column.modules.frozen.edge = false;
 			}
 
 			if (column.parent.isGroup) {
-				var parentEl = _this66.getColGroupParentElement(column);
+				var parentEl = _this67.getColGroupParentElement(column);
 				if (!leftParents.includes(parentEl)) {
-					_this66.layoutElement(parentEl, column);
+					_this67.layoutElement(parentEl, column);
 					leftParents.push(parentEl);
 				}
 
@@ -16280,34 +16310,34 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					parentEl.classList.add("tabulator-frozen-" + column.modules.frozen.position);
 				}
 			} else {
-				_this66.layoutElement(column.getElement(), column);
+				_this67.layoutElement(column.getElement(), column);
 			}
 
 			if (allCells) {
 				column.cells.forEach(function (cell) {
-					_this66.layoutElement(cell.getElement(true), column);
+					_this67.layoutElement(cell.getElement(true), column);
 				});
 			}
 		});
 
 		this.rightColumns.forEach(function (column, i) {
-			column.modules.frozen.margin = _this66.rightPadding - _this66._calcSpace(_this66.rightColumns, i + 1) + "px";
+			column.modules.frozen.margin = _this67.rightPadding - _this67._calcSpace(_this67.rightColumns, i + 1) + "px";
 
-			if (i == _this66.rightColumns.length - 1) {
+			if (i == _this67.rightColumns.length - 1) {
 				column.modules.frozen.edge = true;
 			} else {
 				column.modules.frozen.edge = false;
 			}
 
 			if (column.parent.isGroup) {
-				_this66.layoutElement(_this66.getColGroupParentElement(column), column);
+				_this67.layoutElement(_this67.getColGroupParentElement(column), column);
 			} else {
-				_this66.layoutElement(column.getElement(), column);
+				_this67.layoutElement(column.getElement(), column);
 			}
 
 			if (allCells) {
 				column.cells.forEach(function (cell) {
-					_this66.layoutElement(cell.getElement(true), column);
+					_this67.layoutElement(cell.getElement(true), column);
 				});
 			}
 		});
@@ -16353,7 +16383,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	FrozenColumns.prototype.layoutRow = function (row) {
-		var _this67 = this;
+		var _this68 = this;
 
 		var rowEl = row.getElement();
 
@@ -16364,7 +16394,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			var cell = row.getCell(column);
 
 			if (cell) {
-				_this67.layoutElement(cell.getElement(true), column);
+				_this68.layoutElement(cell.getElement(true), column);
 			}
 		});
 
@@ -16372,7 +16402,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			var cell = row.getCell(column);
 
 			if (cell) {
-				_this67.layoutElement(cell.getElement(true), column);
+				_this68.layoutElement(cell.getElement(true), column);
 			}
 		});
 	};
@@ -16639,12 +16669,12 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Group.prototype.createValueGroups = function () {
-		var _this68 = this;
+		var _this69 = this;
 
 		var level = this.level + 1;
 		if (this.groupManager.allowedValues && this.groupManager.allowedValues[level]) {
 			this.groupManager.allowedValues[level].forEach(function (value) {
-				_this68._createGroup(value, level);
+				_this69._createGroup(value, level);
 			});
 		}
 	};
@@ -17404,7 +17434,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	GroupRows.prototype.getChildGroups = function (group) {
-		var _this69 = this;
+		var _this70 = this;
 
 		var groupComponents = [];
 
@@ -17414,7 +17444,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 		group.groupList.forEach(function (child) {
 			if (child.groupList.length) {
-				groupComponents = groupComponents.concat(_this69.getChildGroups(child));
+				groupComponents = groupComponents.concat(_this70.getChildGroups(child));
 			} else {
 				groupComponents.push(child);
 			}
@@ -18008,13 +18038,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Keybindings.prototype.mapBindings = function (bindings) {
-		var _this70 = this;
+		var _this71 = this;
 
 		var self = this;
 
 		var _loop2 = function _loop2(key) {
 
-			if (_this70.actions[key]) {
+			if (_this71.actions[key]) {
 
 				if (bindings[key]) {
 
@@ -18149,8 +18179,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	Keybindings.prototype.bindings = {
 		navPrev: "shift + 9",
 		navNext: 9,
-		navUp: 38,
-		navDown: 40,
+		navUp: "shift + 38",
+		navDown: "shift + 40",
+		navLeft: "shift + 37",
+		navRight: "shift + 39",
 		scrollPageUp: 33,
 		scrollPageDown: 34,
 		scrollToStart: 36,
@@ -18285,6 +18317,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					cell.nav().left();
 				}
 			}
+			if (this.table.modExists("selectCell")) {
+				var selectCell = this.table.modules.selectCell;
+				if (selectCell.selection.end.col > 0) {
+					selectCell.selection.end.col--;
+				}
+				selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
+			}
 		},
 
 		navRight: function navRight(e) {
@@ -18297,6 +18336,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					e.preventDefault();
 					cell.nav().right();
 				}
+			}
+			if (this.table.modExists("selectCell")) {
+				var selectCell = this.table.modules.selectCell;
+				if (selectCell.selection.end.col < this.table.columnManager.columns.length - 1) {
+					selectCell.selection.end.col++;
+				}
+				selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
 			}
 		},
 
@@ -18311,6 +18357,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					cell.nav().up();
 				}
 			}
+			if (this.table.modExists("selectCell")) {
+				var selectCell = this.table.modules.selectCell;
+				if (selectCell.selection.end.row > 0) {
+					selectCell.selection.end.row--;
+				}
+				selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
+			}
 		},
 
 		navDown: function navDown(e) {
@@ -18323,6 +18376,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					e.preventDefault();
 					cell.nav().down();
 				}
+			}
+			if (this.table.modExists("selectCell")) {
+				var selectCell = this.table.modules.selectCell;
+				if (selectCell.selection.end.row < this.table.rowManager.getVisibleRows().length - 1) {
+					selectCell.selection.end.row++;
+				}
+				selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
 			}
 		},
 
@@ -18372,7 +18432,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Menu.prototype.initializeColumnHeader = function (column) {
-		var _this71 = this;
+		var _this72 = this;
 
 		var headerMenuEl;
 
@@ -18395,7 +18455,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				e.stopPropagation();
 				e.preventDefault();
 
-				_this71.LoadMenuEvent(column, column.definition.headerMenu, e);
+				_this72.LoadMenuEvent(column, column.definition.headerMenu, e);
 			});
 
 			column.titleElement.insertBefore(headerMenuEl, column.titleElement.firstChild);
@@ -18413,7 +18473,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Menu.prototype.tapHold = function (component, menu) {
-		var _this72 = this;
+		var _this73 = this;
 
 		var element = component.getElement(),
 		    tapHold = null,
@@ -18428,7 +18488,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				tapHold = null;
 				loaded = true;
 
-				_this72.LoadMenuEvent(component, menu, e);
+				_this73.LoadMenuEvent(component, menu, e);
 			}, 1000);
 		}, { passive: true });
 
@@ -18476,7 +18536,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Menu.prototype.loadMenu = function (e, component, menu, parentEl) {
-		var _this73 = this;
+		var _this74 = this;
 
 		var touch = !(e instanceof MouseEvent);
 
@@ -18500,7 +18560,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				}
 			} else {
 				this.nestedMenuBlock = setTimeout(function () {
-					_this73.nestedMenuBlock = false;
+					_this74.nestedMenuBlock = false;
 				}, 100);
 			}
 
@@ -18519,7 +18579,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				itemEl.classList.add("tabulator-menu-item");
 
 				if (typeof label == "function") {
-					label = label.call(_this73.table, component.getComponent());
+					label = label.call(_this74.table, component.getComponent());
 				}
 
 				if (label instanceof Node) {
@@ -18529,7 +18589,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				}
 
 				if (typeof disabled == "function") {
-					disabled = disabled.call(_this73.table, component.getComponent());
+					disabled = disabled.call(_this74.table, component.getComponent());
 				}
 
 				if (disabled) {
@@ -18541,8 +18601,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					if (item.menu && item.menu.length) {
 						itemEl.addEventListener("click", function (e) {
 							e.stopPropagation();
-							_this73.hideOldSubMenus(menuEl);
-							_this73.loadMenu(e, component, item.menu, itemEl);
+							_this74.hideOldSubMenus(menuEl);
+							_this74.loadMenu(e, component, item.menu, itemEl);
 						});
 					} else {
 						if (item.action) {
@@ -18562,7 +18622,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		});
 
 		menuEl.addEventListener("click", function (e) {
-			_this73.hideMenu();
+			_this74.hideMenu();
 		});
 
 		this.menuElements.push(menuEl);
@@ -18586,7 +18646,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Menu.prototype.positionMenu = function (element, parentEl, touch, e) {
-		var _this74 = this;
+		var _this75 = this;
 
 		var docHeight = Math.max(document.body.offsetHeight, window.innerHeight),
 		    x,
@@ -18608,11 +18668,11 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		element.style.left = x + "px";
 
 		setTimeout(function () {
-			_this74.table.rowManager.element.addEventListener("scroll", _this74.blurEvent);
-			document.body.addEventListener("click", _this74.blurEvent);
-			document.body.addEventListener("contextmenu", _this74.blurEvent);
-			window.addEventListener("resize", _this74.blurEvent);
-			document.body.addEventListener("keydown", _this74.escEvent);
+			_this75.table.rowManager.element.addEventListener("scroll", _this75.blurEvent);
+			document.body.addEventListener("click", _this75.blurEvent);
+			document.body.addEventListener("contextmenu", _this75.blurEvent);
+			window.addEventListener("resize", _this75.blurEvent);
+			document.body.addEventListener("keydown", _this75.escEvent);
 		}, 100);
 
 		document.body.appendChild(element);
@@ -19356,7 +19416,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//establish connection with other tables
 	MoveRows.prototype.connectToTables = function (row) {
-		var _this75 = this;
+		var _this76 = this;
 
 		var connectionTables;
 
@@ -19380,15 +19440,15 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 			this.connectionSelectorsElements.forEach(function (query) {
 				if (typeof query === "string") {
-					_this75.connectionElements = _this75.connectionElements.concat(Array.prototype.slice.call(document.querySelectorAll(query)));
+					_this76.connectionElements = _this76.connectionElements.concat(Array.prototype.slice.call(document.querySelectorAll(query)));
 				} else {
-					_this75.connectionElements.push(query);
+					_this76.connectionElements.push(query);
 				}
 			});
 
 			this.connectionElements.forEach(function (element) {
 				var dropEvent = function dropEvent(e) {
-					_this75.elementRowDrop(e, element, _this75.moving);
+					_this76.elementRowDrop(e, element, _this76.moving);
 				};
 
 				element.addEventListener("mouseup", dropEvent);
@@ -19762,7 +19822,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Page.prototype.generatePageSizeSelectList = function () {
-		var _this76 = this;
+		var _this77 = this;
 
 		var pageSizes = [];
 
@@ -19797,14 +19857,14 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				itemEl.value = item;
 
 				if (item === true) {
-					_this76.table.modules.localize.bind("pagination|all", function (value) {
+					_this77.table.modules.localize.bind("pagination|all", function (value) {
 						itemEl.innerHTML = value;
 					});
 				} else {
 					itemEl.innerHTML = item;
 				}
 
-				_this76.pageSizeSelect.appendChild(itemEl);
+				_this77.pageSizeSelect.appendChild(itemEl);
 			});
 
 			this.pageSizeSelect.value = this.size;
@@ -19998,7 +20058,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//set current page number
 	Page.prototype.setPage = function (page) {
-		var _this77 = this;
+		var _this78 = this;
 
 		var self = this;
 
@@ -20024,9 +20084,9 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 			page = parseInt(page);
 
-			if (page > 0 && page <= _this77.max) {
-				_this77.page = page;
-				_this77.trigger().then(function () {
+			if (page > 0 && page <= _this78.max) {
+				_this78.page = page;
+				_this78.trigger().then(function () {
 					resolve();
 				}).catch(function () {
 					reject();
@@ -20036,24 +20096,24 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					self.table.modules.persistence.save("page");
 				}
 			} else {
-				console.warn("Pagination Error - Requested page is out of range of 1 - " + _this77.max + ":", page);
+				console.warn("Pagination Error - Requested page is out of range of 1 - " + _this78.max + ":", page);
 				reject();
 			}
 		});
 	};
 
 	Page.prototype.setPageToRow = function (row) {
-		var _this78 = this;
+		var _this79 = this;
 
 		return new Promise(function (resolve, reject) {
 
-			var rows = _this78.table.rowManager.getDisplayRows(_this78.displayIndex - 1);
+			var rows = _this79.table.rowManager.getDisplayRows(_this79.displayIndex - 1);
 			var index = rows.indexOf(row);
 
 			if (index > -1) {
-				var page = _this78.size === true ? 1 : Math.ceil((index + 1) / _this78.size);
+				var page = _this79.size === true ? 1 : Math.ceil((index + 1) / _this79.size);
 
-				_this78.setPage(page).then(function () {
+				_this79.setPage(page).then(function () {
 					resolve();
 				}).catch(function () {
 					reject();
@@ -20149,34 +20209,11 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//previous page
 	Page.prototype.previousPage = function () {
-		var _this79 = this;
-
-		return new Promise(function (resolve, reject) {
-			if (_this79.page > 1) {
-				_this79.page--;
-				_this79.trigger().then(function () {
-					resolve();
-				}).catch(function () {
-					reject();
-				});
-
-				if (_this79.table.options.persistence && _this79.table.modExists("persistence", true) && _this79.table.modules.persistence.config.page) {
-					_this79.table.modules.persistence.save("page");
-				}
-			} else {
-				console.warn("Pagination Error - Previous page would be less than page 1:", 0);
-				reject();
-			}
-		});
-	};
-
-	//next page
-	Page.prototype.nextPage = function () {
 		var _this80 = this;
 
 		return new Promise(function (resolve, reject) {
-			if (_this80.page < _this80.max) {
-				_this80.page++;
+			if (_this80.page > 1) {
+				_this80.page--;
 				_this80.trigger().then(function () {
 					resolve();
 				}).catch(function () {
@@ -20187,8 +20224,31 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					_this80.table.modules.persistence.save("page");
 				}
 			} else {
-				if (!_this80.progressiveLoad) {
-					console.warn("Pagination Error - Next page would be greater than maximum page of " + _this80.max + ":", _this80.max + 1);
+				console.warn("Pagination Error - Previous page would be less than page 1:", 0);
+				reject();
+			}
+		});
+	};
+
+	//next page
+	Page.prototype.nextPage = function () {
+		var _this81 = this;
+
+		return new Promise(function (resolve, reject) {
+			if (_this81.page < _this81.max) {
+				_this81.page++;
+				_this81.trigger().then(function () {
+					resolve();
+				}).catch(function () {
+					reject();
+				});
+
+				if (_this81.table.options.persistence && _this81.table.modExists("persistence", true) && _this81.table.modules.persistence.config.page) {
+					_this81.table.modules.persistence.save("page");
+				}
+			} else {
+				if (!_this81.progressiveLoad) {
+					console.warn("Pagination Error - Next page would be greater than maximum page of " + _this81.max + ":", _this81.max + 1);
 				}
 				reject();
 			}
@@ -20246,28 +20306,28 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	Page.prototype.trigger = function () {
-		var _this81 = this;
+		var _this82 = this;
 
 		var left;
 
 		return new Promise(function (resolve, reject) {
 
-			switch (_this81.mode) {
+			switch (_this82.mode) {
 				case "local":
-					left = _this81.table.rowManager.scrollLeft;
+					left = _this82.table.rowManager.scrollLeft;
 
-					_this81.table.rowManager.refreshActiveData("page");
-					_this81.table.rowManager.scrollHorizontal(left);
+					_this82.table.rowManager.refreshActiveData("page");
+					_this82.table.rowManager.scrollHorizontal(left);
 
-					_this81.table.options.pageLoaded.call(_this81.table, _this81.getPage());
+					_this82.table.options.pageLoaded.call(_this82.table, _this82.getPage());
 					resolve();
 					break;
 
 				case "remote":
 				case "progressive_load":
 				case "progressive_scroll":
-					_this81.table.modules.ajax.blockActiveRequest();
-					_this81._getRemotePage().then(function () {
+					_this82.table.modules.ajax.blockActiveRequest();
+					_this82._getRemotePage().then(function () {
 						resolve();
 					}).catch(function () {
 						reject();
@@ -20275,14 +20335,14 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					break;
 
 				default:
-					console.warn("Pagination Error - no such pagination mode:", _this81.mode);
+					console.warn("Pagination Error - no such pagination mode:", _this82.mode);
 					reject();
 			}
 		});
 	};
 
 	Page.prototype._getRemotePage = function () {
-		var _this82 = this;
+		var _this83 = this;
 
 		var self = this,
 		    oldParams,
@@ -20299,33 +20359,33 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			pageParams = self.table.modules.ajax.getParams();
 
 			//configure request params
-			pageParams[_this82.dataSentNames.page] = self.page;
+			pageParams[_this83.dataSentNames.page] = self.page;
 
 			//set page size if defined
-			if (_this82.size) {
-				pageParams[_this82.dataSentNames.size] = _this82.size;
+			if (_this83.size) {
+				pageParams[_this83.dataSentNames.size] = _this83.size;
 			}
 
 			//set sort data if defined
-			if (_this82.table.options.ajaxSorting && _this82.table.modExists("sort")) {
+			if (_this83.table.options.ajaxSorting && _this83.table.modExists("sort")) {
 				var sorters = self.table.modules.sort.getSort();
 
 				sorters.forEach(function (item) {
 					delete item.column;
 				});
 
-				pageParams[_this82.dataSentNames.sorters] = sorters;
+				pageParams[_this83.dataSentNames.sorters] = sorters;
 			}
 
 			//set filter data if defined
-			if (_this82.table.options.ajaxFiltering && _this82.table.modExists("filter")) {
+			if (_this83.table.options.ajaxFiltering && _this83.table.modExists("filter")) {
 				var filters = self.table.modules.filter.getFilters(true, true);
-				pageParams[_this82.dataSentNames.filters] = filters;
+				pageParams[_this83.dataSentNames.filters] = filters;
 			}
 
 			self.table.modules.ajax.setParams(pageParams);
 
-			self.table.modules.ajax.sendRequest(_this82.progressiveLoad).then(function (data) {
+			self.table.modules.ajax.sendRequest(_this83.progressiveLoad).then(function (data) {
 				self._parseRemoteData(data);
 				resolve();
 			}).catch(function (e) {
@@ -20866,7 +20926,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			this.element = document.createElement("div");
 			this.element.classList.add("tabulator-print-table");
 
-			this.element.appendChild(this.table.modules.export.genereateTable(this.table.options.printConfig, this.table.options.printStyled, this.table.options.printRowRange, "print"));
+			this.element.appendChild(this.table.modules.export.generateTable(this.table.options.printConfig, this.table.options.printStyled, this.table.options.printRowRange, "print"));
 
 			this.table.element.style.display = "none";
 
@@ -20888,7 +20948,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		    scrollY = window.scrollY,
 		    headerEl = document.createElement("div"),
 		    footerEl = document.createElement("div"),
-		    tableEl = this.table.modules.export.genereateTable(typeof config != "undefined" ? config : this.table.options.printConfig, typeof style != "undefined" ? style : this.table.options.printStyled, visible, "print"),
+		    tableEl = this.table.modules.export.generateTable(typeof config != "undefined" ? config : this.table.options.printConfig, typeof style != "undefined" ? style : this.table.options.printStyled, visible, "print"),
 		    headerContent,
 		    footerContent;
 
@@ -21502,7 +21562,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	};
 
 	ResizeTable.prototype.initialize = function (row) {
-		var _this83 = this;
+		var _this84 = this;
 
 		var table = this.table,
 		    tableStyle;
@@ -21525,13 +21585,13 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					var nodeHeight = Math.floor(entry[0].contentRect.height);
 					var nodeWidth = Math.floor(entry[0].contentRect.width);
 
-					if (_this83.tableHeight != nodeHeight || _this83.tableWidth != nodeWidth) {
-						_this83.tableHeight = nodeHeight;
-						_this83.tableWidth = nodeWidth;
+					if (_this84.tableHeight != nodeHeight || _this84.tableWidth != nodeWidth) {
+						_this84.tableHeight = nodeHeight;
+						_this84.tableWidth = nodeWidth;
 
 						if (table.element.parentNode) {
-							_this83.containerHeight = table.element.parentNode.clientHeight;
-							_this83.containerWidth = table.element.parentNode.clientWidth;
+							_this84.containerHeight = table.element.parentNode.clientHeight;
+							_this84.containerWidth = table.element.parentNode.clientWidth;
 						}
 
 						if (table.options.virtualDomHoz) {
@@ -21555,11 +21615,11 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 						var nodeHeight = Math.floor(entry[0].contentRect.height);
 						var nodeWidth = Math.floor(entry[0].contentRect.width);
 
-						if (_this83.containerHeight != nodeHeight || _this83.containerWidth != nodeWidth) {
-							_this83.containerHeight = nodeHeight;
-							_this83.containerWidth = nodeWidth;
-							_this83.tableHeight = table.element.clientHeight;
-							_this83.tableWidth = table.element.clientWidth;
+						if (_this84.containerHeight != nodeHeight || _this84.containerWidth != nodeWidth) {
+							_this84.containerHeight = nodeHeight;
+							_this84.containerWidth = nodeWidth;
+							_this84.tableHeight = table.element.clientHeight;
+							_this84.tableWidth = table.element.clientWidth;
 						}
 
 						if (table.options.virtualDomHoz) {
@@ -21915,6 +21975,223 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	Tabulator.prototype.registerModule("responsiveLayout", ResponsiveLayout);
 
+	var SELECTION_LEFT_CLASS = 'selection-left';
+	var SELECTION_RIGHT_CLASS = 'selection-right';
+	var SELECTION_TOP_CLASS = 'selection-top';
+	var SELECTION_BOTTOM_CLASS = 'selection-bottom';
+
+	var CELL_SELECTED_CLASS = 'tabulator-selected';
+	var SELECTABLE_CLASS = 'tabulator-selectable';
+	var UNSELECTABLE_CLASS = 'tabulator-unselectable';
+	var BLOCK_TABLE_TEXT_SELECTION = 'tabulator-block-select';
+
+	function clearHighlight(table) {
+		var columns = table.columnManager.columnsByIndex;
+		for (var x = 0; x < columns.length; x++) {
+			var col = columns[x];
+			col.cells.forEach(function (cell) {
+				[CELL_SELECTED_CLASS, SELECTION_LEFT_CLASS, SELECTION_TOP_CLASS, SELECTION_RIGHT_CLASS, SELECTION_BOTTOM_CLASS].forEach(function (className) {
+					return cell.getElement().classList.remove(className);
+				});
+			});
+		}
+	}
+
+	function orderRectCoords(start, end) {
+		var startCol, endCol;
+		var startRow, endRow;
+
+		if (start.col >= end.col) {
+			startCol = end.col;
+			endCol = start.col;
+		} else {
+			startCol = start.col;
+			endCol = end.col;
+		}
+
+		if (start.row >= end.row) {
+			startRow = end.row;
+			endRow = start.row;
+		} else {
+			startRow = start.row;
+			endRow = end.row;
+		}
+
+		return {
+			startCol: startCol, startRow: startRow,
+			endCol: endCol, endRow: endRow
+		};
+	}
+
+	function highlightCells(table, start, end) {
+		var cells = [];
+
+		var coords = orderRectCoords(start, end);
+
+		// Get the list of active columns.
+		var selectedColumns = table.columnManager.columnsByIndex;
+
+		for (var x = coords.startCol; x <= coords.endCol; x++) {
+			var col = selectedColumns[x];
+
+			col.cells.forEach(function (cell) {
+				var rowIndex = cell.row.parent.findRowIndex(cell.row, cell.row.parent.rows);
+
+				if (rowIndex >= coords.startRow && rowIndex <= coords.endRow) {
+
+					if (!(rowIndex == start.row && x == start.col)) {
+						cell.getElement().classList.add(CELL_SELECTED_CLASS);
+					}
+
+					if (x == coords.startCol) {
+						cell.getElement().classList.add(SELECTION_LEFT_CLASS);
+					}
+					if (x == coords.endCol) {
+						cell.getElement().classList.add(SELECTION_RIGHT_CLASS);
+					}
+
+					if (rowIndex == coords.startRow) {
+						cell.getElement().classList.add(SELECTION_TOP_CLASS);
+					}
+					if (rowIndex == coords.endRow) {
+						cell.getElement().classList.add(SELECTION_BOTTOM_CLASS);
+					}
+
+					cells.push(cell);
+				}
+			});
+		}
+		return cells;
+	}
+
+	function createEmptySelection() {
+		var emptyCoord = {
+			row: 0,
+			col: 0
+		};
+
+		return {
+			start: emptyCoord,
+			end: emptyCoord,
+			data: []
+		};
+	}
+
+	var SelectCell = function SelectCell(table) {
+		this.table = table; //hold Tabulator object
+		this.selecting = false; //flag selecting in progress
+
+		this.selection = createEmptySelection();
+		this.selectedRows = []; //hold selected rows
+		this.selectedCols = [];
+	};
+
+	SelectCell.prototype.clearSelectionData = function () {
+		this.selecting = false;
+
+		this.selection = createEmptySelection();
+		this.selectedRows = [];
+		this.selectedCols = [];
+	};
+
+	SelectCell.prototype.getSelection = function () {
+		return this.selection;
+	};
+
+	SelectCell.prototype.getSelectedRows = function () {
+		return this.selectedRows.map(function (row) {
+			return row.getComponent();
+		});
+	};
+
+	SelectCell.prototype.getSelectedColumns = function () {
+		return this.selectedCols.map(function (col) {
+			return col.getComponent();
+		});
+	};
+
+	SelectCell.prototype.changeSelection = function (start, end) {
+		var _this85 = this;
+
+		this.selection.start = start;
+		this.selection.end = end;
+		this.selectedRows = [];
+		this.selectedCols = [];
+
+		clearHighlight(this.table);
+
+		var selectedCells = highlightCells(this.table, start, end);
+
+		var rows = [];
+		var cols = [];
+		selectedCells.forEach(function (cell) {
+			rows.push(cell.row);
+			cols.push(cell.column);
+		});
+
+		// Dedupe the row
+		rows.filter(function (item, pos) {
+			return rows.indexOf(item) == pos;
+		}).forEach(function (row) {
+			return _this85.selectedRows.push(row);
+		});
+
+		cols.filter(function (item, pos) {
+			return cols.indexOf(item) == pos;
+		}).forEach(function (col) {
+			return _this85.selectedCols.push(col);
+		});
+	};
+
+	SelectCell.prototype.initializeCell = function (cell) {
+		var self = this,
+		    element = cell.getElement();
+
+		//set cell selection class
+		element.classList.add(SELECTABLE_CLASS);
+		element.classList.remove(UNSELECTABLE_CLASS);
+
+		if (self.table.options.selectable && self.table.options.selectionType == 'cell' && self.table.options.selectable != "highlight") {
+
+			var getCurrentCellPosition = function getCurrentCellPosition(cell) {
+				return {
+					col: cell.column.parent.findColumnIndex(cell.column),
+					row: cell.row.parent.findRowIndex(cell.row, cell.row.parent.rows)
+				};
+			};
+
+			element.addEventListener("mousedown", function (e) {
+				self.table._clearSelection();
+				self.table.element.classList.add(BLOCK_TABLE_TEXT_SELECTION);
+				self.selectedRows = [];
+				self.selectedCols = [];
+				self.selecting = true;
+
+				var start = getCurrentCellPosition(cell);
+				self.changeSelection(start, start);
+
+				return false;
+			});
+
+			element.addEventListener("mouseover", function (e) {
+				if (self.selecting) {
+					self.changeSelection(self.selection.start, getCurrentCellPosition(cell));
+				}
+			});
+
+			element.addEventListener("mouseup", function (e) {
+				if (self.selecting) {
+					self.selecting = false;
+					self.table.element.classList.remove(BLOCK_TABLE_TEXT_SELECTION);
+
+					self.changeSelection(self.selection.start, getCurrentCellPosition(cell));
+				}
+			});
+		}
+	};
+
+	Tabulator.prototype.registerModule("selectCell", SelectCell);
+
 	var SelectRow = function SelectRow(table) {
 		this.table = table; //hold Tabulator object
 		this.selecting = false; //flag selecting in progress
@@ -22073,14 +22350,14 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//select a number of rows
 	SelectRow.prototype.selectRows = function (rows) {
-		var _this84 = this;
+		var _this86 = this;
 
 		var rowMatch;
 
 		switch (typeof rows === 'undefined' ? 'undefined' : _typeof(rows)) {
 			case "undefined":
 				this.table.rowManager.rows.forEach(function (row) {
-					_this84._selectRow(row, true, true);
+					_this86._selectRow(row, true, true);
 				});
 
 				this._rowSelectionChanged();
@@ -22094,7 +22371,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					this._selectRow(rowMatch, true, true);
 				} else {
 					this.table.rowManager.getRows(rows).forEach(function (row) {
-						_this84._selectRow(row, true, true);
+						_this86._selectRow(row, true, true);
 					});
 				}
 
@@ -22104,7 +22381,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			default:
 				if (Array.isArray(rows)) {
 					rows.forEach(function (row) {
-						_this84._selectRow(row, true, true);
+						_this86._selectRow(row, true, true);
 					});
 
 					this._rowSelectionChanged();
@@ -22622,7 +22899,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	//sort each item in sort list
 	Sort.prototype._sortItems = function (data, sortList) {
-		var _this85 = this;
+		var _this87 = this;
 
 		var sorterCount = sortList.length - 1;
 
@@ -22632,7 +22909,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			for (var i = sorterCount; i >= 0; i--) {
 				var sortItem = sortList[i];
 
-				result = _this85._sortRow(a, b, sortItem.column, sortItem.dir, sortItem.params);
+				result = _this87._sortRow(a, b, sortItem.column, sortItem.dir, sortItem.params);
 
 				if (result !== 0) {
 					break;

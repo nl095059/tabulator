@@ -1009,6 +1009,26 @@
   border-radius: 14px;
 }
 
+.tabulator-row .tabulator-cell.selection-top {
+  border-top: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.selection-left {
+  border-left: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.selection-right {
+  border-right: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.selection-bottom {
+  border-bottom: 2px solid #3067fd;
+}
+
+.tabulator-row .tabulator-cell.tabulator-selected {
+  background-color: #9ABCEA;
+}
+
 .tabulator-row.tabulator-group {
   box-sizing: border-box;
   border-bottom: 1px solid #999;

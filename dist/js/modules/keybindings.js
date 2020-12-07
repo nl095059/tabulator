@@ -177,8 +177,10 @@ Keybindings.prototype.checkBinding = function (e, binding) {
 Keybindings.prototype.bindings = {
 	navPrev: "shift + 9",
 	navNext: 9,
-	navUp: 38,
-	navDown: 40,
+	navUp: "shift + 38",
+	navDown: "shift + 40",
+	navLeft: "shift + 37",
+	navRight: "shift + 39",
 	scrollPageUp: 33,
 	scrollPageDown: 34,
 	scrollToStart: 36,
@@ -313,6 +315,13 @@ Keybindings.prototype.actions = {
 				cell.nav().left();
 			}
 		}
+		if (this.table.modExists("selectCell")) {
+			var selectCell = this.table.modules.selectCell;
+			if (selectCell.selection.end.col > 0) {
+				selectCell.selection.end.col--;
+			}
+			selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
+		}
 	},
 
 	navRight: function navRight(e) {
@@ -325,6 +334,13 @@ Keybindings.prototype.actions = {
 				e.preventDefault();
 				cell.nav().right();
 			}
+		}
+		if (this.table.modExists("selectCell")) {
+			var selectCell = this.table.modules.selectCell;
+			if (selectCell.selection.end.col < this.table.columnManager.columns.length - 1) {
+				selectCell.selection.end.col++;
+			}
+			selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
 		}
 	},
 
@@ -339,6 +355,13 @@ Keybindings.prototype.actions = {
 				cell.nav().up();
 			}
 		}
+		if (this.table.modExists("selectCell")) {
+			var selectCell = this.table.modules.selectCell;
+			if (selectCell.selection.end.row > 0) {
+				selectCell.selection.end.row--;
+			}
+			selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
+		}
 	},
 
 	navDown: function navDown(e) {
@@ -351,6 +374,13 @@ Keybindings.prototype.actions = {
 				e.preventDefault();
 				cell.nav().down();
 			}
+		}
+		if (this.table.modExists("selectCell")) {
+			var selectCell = this.table.modules.selectCell;
+			if (selectCell.selection.end.row < this.table.rowManager.getVisibleRows().length - 1) {
+				selectCell.selection.end.row++;
+			}
+			selectCell.changeSelection(selectCell.selection.start, selectCell.selection.end);
 		}
 	},
 

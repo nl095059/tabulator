@@ -4911,7 +4911,7 @@ Row.prototype.generateElement = function () {
 	this.createElement();
 
 	//set row selection characteristics
-	if (self.table.options.selectable !== false && self.table.modExists("selectRow")) {
+	if (self.table.options.selectable !== false && self.table.options.selectionType === 'row' && self.table.modExists("selectRow")) {
 		self.table.modules.selectRow.initializeRow(this);
 	}
 
@@ -5790,6 +5790,12 @@ Cell.prototype._configureCell = function () {
 		self.table.modules.moveRow.initializeCell(self);
 	}
 
+	if (self.table.options.selectable !== false) {
+		if (self.table.options.selectionType === 'cell' && self.table.modExists('selectCell')) {
+			self.table.modules.selectCell.initializeCell(this);
+		}
+	}
+
 	//hide cell if not visible
 	if (!self.column.visible) {
 		self.hide();
@@ -6664,6 +6670,7 @@ Tabulator.prototype.defaultOptions = {
 	selectableCheck: function selectableCheck(data, row) {
 		return true;
 	}, //check wheather row is selectable
+	selectionType: "row",
 
 	headerFilterLiveFilterDelay: 300, //delay before updating column after user types in header filter
 	headerFilterPlaceholder: false, //placeholder text to display in header filters
