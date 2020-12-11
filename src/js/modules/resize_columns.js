@@ -4,7 +4,6 @@ var ResizeColumns = function(table){
 	this.startX = false;
 	this.startWidth = false;
 	this.handle = null;
-	this.prevHandle = null;
 };
 
 ResizeColumns.prototype.initializeColumn = function(type, column, element){
@@ -18,14 +17,11 @@ ResizeColumns.prototype.initializeColumn = function(type, column, element){
 		column.modules.resize = {variableHeight:variableHeight};
 	}
 
-	if(mode === true || mode == type){
+	if(mode === true || mode == type && self._checkResizability(column)) {
 
 		var handle = document.createElement('div');
 		handle.className = "tabulator-col-resize-handle";
-
-
-		var prevHandle = document.createElement('div');
-		prevHandle.className = "tabulator-col-resize-handle prev";
+		handle.appendChild(document.createElement("span"));
 
 		handle.addEventListener("click", function(e){
 			e.stopPropagation();
@@ -53,49 +49,7 @@ ResizeColumns.prototype.initializeColumn = function(type, column, element){
 			}
 		});
 
-
-		prevHandle.addEventListener("click", function(e){
-			e.stopPropagation();
-		});
-
-		var prevHandleDown = function(e){
-			var nearestColumn, colIndex, prevColumn;
-
-			nearestColumn = column.getFirstColumn();
-
-			if(nearestColumn){
-				colIndex = self.table.columnManager.findColumnIndex(nearestColumn);
-				prevColumn = colIndex > 0 ? self.table.columnManager.getColumnByIndex(colIndex - 1) : false;
-
-				if(prevColumn && self._checkResizability(prevColumn)){
-					self.startColumn = column;
-					self._mouseDown(e, prevColumn, prevHandle);
-				}
-			}
-		};
-
-		prevHandle.addEventListener("mousedown", prevHandleDown);
-		prevHandle.addEventListener("touchstart", prevHandleDown, {passive: true});
-
-		//resize column on double click
-		prevHandle.addEventListener("dblclick", function(e){
-			var nearestColumn, colIndex, prevColumn;
-
-			nearestColumn = column.getFirstColumn();
-
-			if(nearestColumn){
-				colIndex = self.table.columnManager.findColumnIndex(nearestColumn);
-				prevColumn = colIndex > 0 ? self.table.columnManager.getColumnByIndex(colIndex - 1) : false;
-
-				if(prevColumn && self._checkResizability(prevColumn)){
-					e.stopPropagation();
-					prevColumn.reinitializeWidth(true);
-				}
-			}
-		});
-
 		element.appendChild(handle);
-		element.appendChild(prevHandle);
 	}
 };
 
