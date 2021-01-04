@@ -203,6 +203,14 @@ Tabulator.prototype.defaultOptions = {
 	ajaxProgressiveLoadDelay:0, //delay between requests
 	ajaxProgressiveLoadScrollMargin:0, //margin before scroll begins
 
+	asyncAjaxInitRequestFunc: false,
+	asyncAjaxInitResponse: false,
+	asyncAjaxStatusRequestFunc: false,
+	asyncAjaxStatusResponse: false,
+	asyncAjaxStatusPollInterval: 2000,
+	asyncAjaxQueryRequestFunc: false,
+	asyncAjaxQueryResponse: false,
+	
 	groupBy:false, //enable table grouping and set field to group by
 	groupStartOpen:true, //starting state of group
 	groupValues:false,
@@ -762,8 +770,9 @@ Tabulator.prototype._loadInitialData = function(){
 					});
 
 					return;
-				}else{
-					self.rowManager.setData(self.options.data, false, true);
+				} else if ((self.options.asyncAjaxInitRequestFunc && self.modExists("async_query"))) {
+					self.modules.async_query.initialise();
+					// self.rowManager.setData(self.options.data, false, true);
 				}
 			}
 
