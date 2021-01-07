@@ -75,6 +75,57 @@ Ajax.prototype.initialize = function(){
 	}
 };
 
+Ajax.prototype.initializeQuery = function(url, viewPort) {
+	return this.loaderPromise(url, this.config, this.params).then((data)=>{
+		return this.table.options.dataSource.async.initResponse(data);
+	})
+	.catch((error)=>{
+		return error;
+	});
+};
+
+
+Ajax.prototype.getStatus = function(url) {
+	const table = this.table;
+	return this.loaderPromise(url, this.config, this.params).then((data)=>{
+		return table.options.dataSource.async.statusResponse(data);
+	})
+	.catch((error)=>{
+		return error;
+	});
+};
+
+
+Ajax.prototype.getData = function(url) {
+	const table = this.table;
+
+	this.loading = true;
+	this.showLoader();
+
+	return this.loaderPromise(url, this.config, this.params).then((data)=>{
+
+		this.hideLoader();
+		this.loading = false;
+
+		return table.options.dataSource.async.resultsResponse(data);
+	})
+	.catch((error)=>{
+		this.showError();
+
+		setTimeout(function(){
+			this.hideLoader();
+		}, 3000);
+
+		this.loading = false;
+
+		return error;
+	});
+};
+
+Ajax.prototype.getResults = function(inPosition, columnsChanged){
+	return this._loadDataStandard(inPosition, columnsChanged);
+};
+
 Ajax.prototype.createLoaderElement = function (){
 	var el = document.createElement("div");
 	el.classList.add("tabulator-loader");
