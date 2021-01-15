@@ -192,7 +192,6 @@ Tabulator.prototype.defaultOptions = {
 	paginationAddRow: "page", //add rows on table or page
 
 	queryInfoVisible: false,
-	queryCountVisible: false,
 
 	dataSource: false,
 

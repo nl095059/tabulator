@@ -53,11 +53,6 @@ Page.prototype.createElements = function(){
 		this.queryInfo.classList.add("query-info");
 	}
 
-	if (this.table.options.queryCountVisible) {
-		this.queryCount = document.createElement("span");
-		this.queryCount.classList.add("query-count");
-	}
-
 	if(this.table.options.paginationSizeSelector){
 		this.pageSizeSelect = document.createElement("select");
 		this.pageSizeSelect.classList.add("tabulator-page-size");
@@ -202,9 +197,6 @@ Page.prototype.initialize = function(hidden){
 	if (self.queryInfo) {
 		self.element.appendChild(self.queryInfo);
 	}
-	if (self.queryCount) {
-		self.element.appendChild(self.queryCount);
-	}
 	self.element.appendChild(self.firstBut);
 	self.element.appendChild(self.prevBut);
 	self.element.appendChild(self.pagesElement);
@@ -260,7 +252,6 @@ Page.prototype.getDisplayIndex = function(){
 	return this.displayIndex;
 };
 
-
 //calculate maximum page from number of rows
 Page.prototype.setMaxRows = function(rowCount){
 	if(!rowCount){
@@ -300,15 +291,9 @@ Page.prototype.setMaxPage = function(max){
 	}
 };
 
-Page.prototype.setQueryInfo = function(info) {
+Page.prototype.setQueryInfo = function(infoHTML) {
 	if (this.queryInfo) {
-		this.queryInfo.innerText = info;
-	}
-};
-
-Page.prototype.setResultCount = function(count) {
-	if (this.queryCount) {
-		this.queryCount.innerText = count;
+		this.queryInfo.innerHTML = infoHTML;
 	}
 };
 

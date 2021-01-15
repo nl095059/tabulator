@@ -159,6 +159,12 @@ describe('Datamanager', () => {
         
             describe('Initialisation', () => {
                 test('initiate is called', (done) => {
+                    tabulator.modules.ajax.initializeQuery.mockImplementation(() => {
+                        return new Promise(function(resolve, reject){
+                            resolve('token12345');
+                        });
+                    });
+                    
                     tabulator.dataManager.initialize().then(() => {
                         expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
 

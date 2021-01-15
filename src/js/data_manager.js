@@ -6,8 +6,7 @@ const AjaxData = function(ajaxMod) {
 	this.dataSentNames = {};
 };
 
-//TODO paginationDataSent moved under dataSource options
-AjaxData.prototype.initialize = function(datasourceOptions, viewPort) {
+AjaxData.prototype.initialize = function(datasourceOptions) {
 	this.datasourceOptions = datasourceOptions;
 
 	//update param names
@@ -15,27 +14,24 @@ AjaxData.prototype.initialize = function(datasourceOptions, viewPort) {
 	this.dataSentNames = Object.assign(this.dataSentNames, datasourceOptions.paginationDataSent);
 	
 	this.dataReceivedNames = Object.assign({}, this.paginationDataReceivedNames);
+};
 
+//TODO paginationDataSent moved under dataSource options
+AjaxData.prototype.initializeQuery = function(datasourceOptions, viewParams) {
 	var ajaxMod = this.ajaxMod;
 
 	if (ajaxMod) {
 		ajaxMod.initialize();
 
 		if (datasourceOptions.async) {
-			const { url, params } = datasourceOptions.async.initRequest.call(this, viewPort);
+			const { url, params } = datasourceOptions.async.initRequest.call(this, viewParams);
 
 			if (params) {
 				ajaxMod.setParams(params);
 			}
 
-			return new Promise(function(resolve, reject) {
-				ajaxMod.initializeQuery(url, viewPort).then((token) => {
-					resolve(token);
-				}).catch((error) => {
-					reject();
-				});
-			});
-		}
+			return ajaxMod.initializeQuery(url, viewParams);
+	    }
 	}
 };
 
@@ -58,7 +54,7 @@ AjaxData.prototype.paginationDataReceivedNames = {
 	"data":"data",
 };
 
-AjaxData.prototype.getData = function(token, viewPort) {
+AjaxData.prototype.getData = function(token, viewParams) {
 	var self = this,
 	oldParams, pageParams;
 	
@@ -68,30 +64,30 @@ AjaxData.prototype.getData = function(token, viewPort) {
 		pageParams = self.ajaxMod.getParams();
 	
 		//configure page request params
-		if (viewPort.page) {
-			pageParams[this.dataSentNames.page] = viewPort.page.page;
+		if (viewParams.page) {
+			pageParams[this.dataSentNames.page] = viewParams.page.page;
 		
 			//set page size if defined
-			if(viewPort.page.pageSize) {
-				pageParams[this.dataSentNames.size] = viewPort.page.pageSize;
+			if(viewParams.page.pageSize) {
+				pageParams[this.dataSentNames.size] = viewParams.page.pageSize;
 			}
 		}
 
 		//set sort data if defined
-		if(viewPort.sort){
-			viewPort.sort.forEach(function(item){
+		if(viewParams.sort){
+			viewParams.sort.forEach(function(item){
 				delete item.column;
 			});
 	
-			pageParams[this.dataSentNames.sorters] = viewPort.sort;
+			pageParams[this.dataSentNames.sorters] = viewParams.sort;
 		}
 	
 		//set filter data if defined
-		if (viewPort.filters) {
-			pageParams[this.dataSentNames.filters] = viewPort.filters;
+		if (viewParams.filters) {
+			pageParams[this.dataSentNames.filters] = viewParams.filters;
 		}
 	
-		const { url, params } = this.datasourceOptions.async.resultsRequest.call(this, token, viewPort);
+		const { url, params } = this.datasourceOptions.async.resultsRequest.call(this, token, viewParams);
 
 		this.ajaxMod.setParams(pageParams);
 	
@@ -114,25 +110,59 @@ AjaxData.prototype.getStatus = function(token) {
 };
 
 const ObjectData = function() {
-	this.data = undefined;
+	this.datasourceOptions = undefined;
 };
 
 ObjectData.prototype.initialize = function(datasourceOptions) {
-	this.data = datasourceOptions.data;
+	this.validateParams(datasourceOptions);
+	this.datasourceOptions = datasourceOptions;
+};
+
+ObjectData.prototype.initializeQuery = function(viewParams) {
 	return new Promise((resolve, reject) => {
-		resolve();
+		try {
+			const token = this.datasourceOptions.async.initializeQuery.call(this, viewParams);
+			resolve(token);
+		} catch (err) {
+			reject(err);
+		}
 	});
+}
+
+ObjectData.prototype.validateParams = function(datasourceOptions) {
+	if (!datasourceOptions.async) {
+		throw new Error('Object datasource only supports async querying at present');
+	}
+	if (!datasourceOptions.async.initializeQuery) {
+		throw new Error('Object datasource has not been passed an initQuery callback');
+	}
+	if (!datasourceOptions.async.getStatus) {
+		throw new Error('Object datasource has not been passed a getStatus callback');
+	}
+	if (!datasourceOptions.async.getResults) {
+		throw new Error('Object datasource has not been passed a getResults callback');
+	}
 };
 
 ObjectData.prototype.getStatus = function() {
 	return new Promise((resolve, reject) => {
-		resolve(this.data);
+		try {
+			const response = this.datasourceOptions.async.getStatus.call(this);
+			resolve(response);
+		} catch (err) {
+			reject(err);
+		}
 	});
 };
 
-ObjectData.prototype.getData = function() {
+ObjectData.prototype.getData = function(viewParams) {
 	return new Promise((resolve, reject) => {
-		resolve(this.data);
+		try {
+			const response = this.datasourceOptions.async.getResults.call(this, viewParams);
+			resolve(response);
+		} catch (err) {
+			reject(err);
+		}
 	});
 };
 
@@ -152,17 +182,18 @@ DataManager.prototype.initialize = function(){
 	const dataSourceOptions = this.table.options.dataSource;
 	const pageMod = this.table.modules.page;
 
-	//TODO make plug and play
 	switch (dataSourceOptions.type) {
 		case 'ajax':
 			this.dataSource = new AjaxData(this.table.modules.ajax);
 			break;
 		case 'object':
-			this.dataSource = new ObjectData();
+			this.dataSource = new ObjectData(dataSourceOptions);
 			break;
 	}
 
-	return this.dataSource.initialize(dataSourceOptions, this.getViewParams()).then((token) => {
+	this.dataSource.initialize(dataSourceOptions);
+
+	return this.dataSource.initializeQuery(dataSourceOptions, this.getViewParams()).then((token) => {
 		this.token = token;
 
 		if (dataSourceOptions.async) {
@@ -175,17 +206,14 @@ DataManager.prototype.initialize = function(){
 		if(this.table.options.pagination && this.table.modExists('page')){
 			pageMod.reset(true, true);
 
-			pageMod.setQueryInfo("Initialising");
+			if (dataSourceOptions.getStatusHTML) {
+				pageMod.setQueryInfo(dataSourceOptions.getStatusHTML.call(this, {state: 'Initialise', count: 0 }));
+			}
 			pageMod.setPage(this.table.options.paginationInitialPage || 1).then(()=>{}).catch(()=>{});
-
 			pageMod._setPageButtons();
 		} else {
 			pageMod.setPage(1);
 		}
-		resolve();
-
-	}).catch((err) => {
-		
 	});
 };
 
@@ -224,33 +252,31 @@ function validateStatusResponse(status) {
 	}
 };
 
-DataManager.prototype.updatePageControls = function(status) {
-	var { count, state } = status;
-
-	// Update page control to reflect new result count
-	if (this.table.modExists("page")) {
-		const pageMod = this.table.modules.page;
-		pageMod.setMaxRows(count);
-		pageMod.setResultCount(count);
-		pageMod.setQueryInfo(state);
-		pageMod._setPageButtons();
-	}
-};
-
 DataManager.prototype.getStatus = function (token) {
+	const dataSourceOptions = this.table.options.dataSource;
 	this.dataSource.getStatus(token).then((status) => {
 
 		validateStatusResponse(status);
 
-		this.updatePageControls(status);
-
-		var { state } = status;
-		// When status is complete or errored.. (Or aborted!) then kill the poller
+		var { count, state } = status;
+		// When status is complete or errored, kill the poller
 		if (state === this.responseCodes.COMPLETE || 
 			state === this.responseCodes.ERRORED) {
 				this.clearPoller();
-
 		}
+
+		// Update the result counts.
+		if (this.table.modExists("page")) {
+			const pageMod = this.table.modules.page;
+			pageMod.setMaxRows(count);
+
+			if (dataSourceOptions.getStatusHTML) {
+				pageMod.setQueryInfo(dataSourceOptions.getStatusHTML.call(this, status));
+			}
+			
+			pageMod._setPageButtons();
+		}
+
 	}).catch((err) => {
 		console.error('Cancelling polling ', err);
 		this.clearPoller();
@@ -283,11 +309,13 @@ DataManager.prototype.abort = function() {
 };
 
 DataManager.prototype.destroy = function() {
+	this.clearPoller();
 };
 
 if (module) {
 	module.exports = {
+		AjaxData,
 		DataManager,
-		AjaxData
+		ObjectData
 	};
 }
