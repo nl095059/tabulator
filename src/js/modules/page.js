@@ -558,7 +558,7 @@ Page.prototype.getRows = function(data){
 };
 
 Page.prototype.trigger = function(){
-	return this.table.dataManager.getData();
+	return this.table.dataManager.getResults();
 };
 
 //handle the footer element being redrawn

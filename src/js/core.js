@@ -894,7 +894,7 @@ Tabulator.prototype.setData = function(data){
 Tabulator.prototype._setData = function(data, inPosition, columnsChanged){
 	var self = this;
 
-	self.dataManager.getData(inPosition, columnsChanged);
+	self.dataManager.getResults(inPosition, columnsChanged);
 };
 
 //clear data

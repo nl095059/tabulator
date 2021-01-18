@@ -1,6 +1,6 @@
 
 
-var { DataManager, AjaxData } = require('./data_manager.js');
+var { DataManager, ObjectData } = require('./data_manager.js');
 window.DataManager = DataManager;
 
 var MockTabulator = function MockTabulator(element, options) {
@@ -82,7 +82,6 @@ MockTabulator.prototype.helpers = {
 
 window.Tabulator = MockTabulator;
 
-require('./modules/ajax_mock.js');
 require('./modules/localize.js');
 require('./modules/page.js');
 
@@ -90,49 +89,22 @@ describe('Datamanager', () => {
     describe('Querying', () => {
 
         describe('Asynchronous', () => {
-       
+            let initializeQuery = jest.fn();
+            let getStatus = jest.fn();
+            let getResults = jest.fn();
+            let getStatusHTML = jest.fn();
+
             function createTable(options) {
                 var tabulator = new Tabulator({}, Object.assign({
                     dataSource: {
-                        type: 'ajax',
-                        ajaxError: () => {},
-                        ajaxFiltering: true,
-                        ajaxProgressiveLoadScrollMargin: 1,
+                        type: 'object',
                         async: {
-                            initRequest(viewParams) {
-                                return {
-                                    url: `http://localhost:8081/query`,
-                                    params: {
-                                        queryName: 'test',
-                                        page: viewParams.page.page
-                                    }
-                                };
-                            },
-                            initResponse(response) {
-                                return response.token;
-                            },
-                            statusRequest(token) {
-                                return {
-                                    url: `http://localhost:8081/results/${token}/metadata`,
-                                    params: {}
-                                };
-                                // await queryService.getStatus(token).then((response) => {
-                            },
-                            statusResponse(response) {
-                                // TODO: Call into a mapping function to convert from our status to a "Tabulator" one
-                                return response;
-                            },
-                            resultsRequest(token, viewParams) {
-                                return {
-                                    url: `http://localhost:8081/results/${token}`,
-                                    params: viewParams
-                                };
-                            },
-                            resultsResponse(response) {
-                                return response.data;
-                            }
+                            initializeQuery,
+                            getStatus,
+                            getResults,
+                            statusPollInterval: 0
                         },
-                        statusPollInterval: 5000,
+                        getStatusHTML,
                         sorting: true,
                     },
                     columns: {},
@@ -141,8 +113,6 @@ describe('Datamanager', () => {
                     paginationInitialPage: 1
                 }, options));
         
-       
-                tabulator.modules.ajax.getParams.mockReturnValue({});
         
                 return tabulator;
             }
@@ -158,176 +128,88 @@ describe('Datamanager', () => {
             });
         
             describe('Initialisation', () => {
-                test('initiate is called', (done) => {
-                    tabulator.modules.ajax.initializeQuery.mockImplementation(() => {
-                        return new Promise(function(resolve, reject){
-                            resolve('token12345');
-                        });
-                    });
+                test('initiate is called', async () => {
                     
-                    tabulator.dataManager.initialize().then(() => {
-                        expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
-
-                        expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-
-                        done();
-                    });
+                    await tabulator.dataManager.initialize();
+                    
+                    expect(tabulator.dataManager.dataSource instanceof ObjectData).toEqual(true);
+                    expect(initializeQuery).toHaveBeenCalled();
                 });
 
-                test('first page of results is requested', (done) => {
-                    tabulator.modules.ajax.initializeQuery.mockImplementation(() => {
-                        return new Promise(function(resolve, reject){
-                            resolve('token12345');
-                        });
-                    });
+                test('first page of results is requested', async () => {
+                    initializeQuery.mockReturnValue('token12345');
+                    getResults.mockReturnValue([{test: 'result'}, {test: 'result2'}]);
 
-                    tabulator.modules.ajax.getData.mockImplementation(() => {
-                        return new Promise(function(resolve, reject){
-                            resolve({test: 'result'});
-                        });
-                    });
+                    await tabulator.dataManager.initialize();
 
-                    tabulator.dataManager.initialize().then(() => {
-                        expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
+                    expect(initializeQuery).toHaveBeenCalled();
 
-                        expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-
-                        expect(tabulator.modules.ajax.setParams).toHaveBeenCalledWith({queryName: "test", page: 1 });
-                        expect(tabulator.modules.ajax.getData).toHaveBeenCalledWith('http://localhost:8081/results/token12345');
-                        expect(tabulator.rowManager.setData).toHaveBeenCalledWith({test: 'result'});
-                        done();
-                    });
+                    expect(getResults).toHaveBeenCalledWith({ page: { max: 1, mode: 'remote', page: 1, pageSize: 5 } });
+                    expect(tabulator.rowManager.setData).toHaveBeenCalledWith([{ test: 'result' }, { test: 'result2' }]);
                 });
             });
 
             describe('polling', () => {
-                test('is not started if the query fails', (done) => {
-                    tabulator.modules.ajax.initializeQuery.mockImplementation(() => {
-                        return new Promise(function(resolve, reject){
-                            reject();
-                        });
-                    });
-
-                    tabulator.dataManager.initialize().then(() => {
-                        expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
-
-                        expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-                        expect(tabulator.modules.ajax.initializeQuery).toHaveBeenCalledWith("http://localhost:8081/query", 
-                            {"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
-
-                        expect(tabulator.dataManager.poller).not.toBeDefined();
-
-                        done();
-                    });
-                });
-
                 describe('successful query initialise', () => {
-                    beforeEach(() => {
-                        tabulator.modules.ajax.initializeQuery.mockImplementation(() => {
-                            return new Promise(function(resolve, reject){
-                                resolve('token12345');
-                            });
-                        });
-                    });
+                    test('starts the poller', async () => {
+                        initializeQuery.mockReturnValue('token12345');
 
-                    test('starts the poller', (done) => {
                         tabulator.dataManager.initializePoller = jest.fn();
 
-                        tabulator.dataManager.initialize().then(() => {
-                            expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
-
-                            expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-                            expect(tabulator.modules.ajax.initializeQuery).toHaveBeenCalledWith("http://localhost:8081/query",
-                                {"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
-
-                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
-
-                            done();
-                        });
+                        await tabulator.dataManager.initialize();
+                        
+                        expect(initializeQuery).toHaveBeenCalled();
+                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
                     });
                 });
 
                 describe('a running query', () => {
                     function setupMocks(statusResponse) {
-                        tabulator.dataManager.initializePoller = jest.fn().mockImplementation((interval, token) => {
-                            return tabulator.dataManager.getStatus(token);
+                        tabulator.dataManager.initializePoller = jest.fn().mockImplementation(() => {
+                            tabulator.dataManager.getStatus();
                         });
 
                         tabulator.dataManager.clearPoller = jest.fn();
 
-                        tabulator.modules.ajax.getStatus.mockImplementation(() => {
-                            return new Promise(function(resolve, reject){
-                                resolve(statusResponse);
-                            });
-                        });
+                        getStatus.mockImplementation(() => statusResponse);
                     }
 
                     beforeEach(() => {
-                        tabulator.modules.ajax.initializeQuery.mockImplementation(() => {
-                            return new Promise(function(resolve, reject){
-                                resolve('token12345');
-                            });
-                        });
+                        initializeQuery.mockReturnValue('token12345');
                     });
 
-                    test('is stopped if the query status is errored', (done) => {
+                    test('is stopped if the query status is errored', async () => {
                         setupMocks({ state: "Error", count: 0});
 
-                        tabulator.dataManager.initialize().then(() => {
-                            expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
+                        await tabulator.dataManager.initialize();
 
-                            expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-                            expect(tabulator.modules.ajax.initializeQuery).toHaveBeenCalledWith("http://localhost:8081/query",
-                                {"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
+                        expect(initializeQuery).toHaveBeenCalled();
 
-                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
-                            expect(tabulator.modules.ajax.getStatus).toHaveBeenCalledWith("http://localhost:8081/results/token12345/metadata");
-                            expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
-
-                            done();
-                        });
+                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                        expect(getStatus).toHaveBeenCalled();
+                        expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
                     });
 
-                    test('is stopped if the query succeeds', (done) => {
+                    test('is stopped if the query succeeds', async () => {
                         setupMocks({ state: "Finished", count: 0});
 
-                        tabulator.dataManager.initialize().then(() => {
-                            expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
+                        await tabulator.dataManager.initialize();
+                        
 
-                            expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-                            expect(tabulator.modules.ajax.initializeQuery).toHaveBeenCalledWith("http://localhost:8081/query",
-                            {"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
-
-                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
-                            expect(tabulator.modules.ajax.getStatus).toHaveBeenCalledWith("http://localhost:8081/results/token12345/metadata");
-                            expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
-
-                            done();
-                        });
+                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                        expect(getStatus).toHaveBeenCalled();
+                        expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
                     });
 
-
-                    test('is stopped if the query is cancelled', (done) => {
+                    test('is stopped if the query is cancelled', async () => {
                         setupMocks({ state: "In Progress", count: 0});
 
-                        tabulator.dataManager.initialize().then(() => {
-                            expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
+                        await tabulator.dataManager.initialize();
 
-                            expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-                            expect(tabulator.modules.ajax.initializeQuery).toHaveBeenCalledWith("http://localhost:8081/query",
-                            {"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
-
-                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
-                            expect(tabulator.modules.ajax.getStatus).toHaveBeenCalledWith("http://localhost:8081/results/token12345/metadata");
-
-                            expect(tabulator.dataManager.clearPoller).not.toHaveBeenCalled();
-
-                            tabulator.dataManager.abort();
-
-                            expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
-
-                            done();
-                        });
+                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                        expect(tabulator.dataManager.clearPoller).not.toHaveBeenCalled();
+                        tabulator.dataManager.abort();
+                        expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
                     });
                 });
             });
@@ -335,53 +217,28 @@ describe('Datamanager', () => {
             describe('fetching', () => {
 
                 function setupMocks(statusResponse) {
-                    tabulator.dataManager.initializePoller = jest.fn().mockImplementation((interval, token) => {
-                        return tabulator.dataManager.getStatus(token);
+                    tabulator.dataManager.initializePoller = jest.fn().mockImplementation(() => {
+                        tabulator.dataManager.getStatus();
                     });
 
                     tabulator.dataManager.clearPoller = jest.fn();
 
-                    tabulator.modules.ajax.getStatus.mockImplementation(() => {
-                        return new Promise(function(resolve, reject){
-                            resolve(statusResponse);
-                        });
-                    });
-
-                    tabulator.modules.ajax.initializeQuery.mockImplementation(() => {
-                        return new Promise(function(resolve, reject){
-                            resolve('token12345');
-                        });
-                    });
-
-                    tabulator.modules.ajax.getData.mockImplementation(() => {
-                        return new Promise(function(resolve, reject){
-                            resolve({test: 'result'});
-                        });
-                    });
+                    getStatus.mockImplementation(() => statusResponse);
                 }
 
-                test('Retrieves a given page of results', async (done) => {
+                test('Retrieves a given page of results', async () => {
                     setupMocks({ state: "Finished", count: 50});
 
                     await tabulator.dataManager.initialize();
+                    expect(getResults).toHaveBeenCalledWith({"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
+                    expect(getStatus).toHaveBeenCalled();
 
-                        expect(tabulator.dataManager.dataSource instanceof AjaxData).toEqual(true);
+                    expect(tabulator.rowManager.setData).toHaveBeenCalledTimes(1);
+                    
+                    await tabulator.modules.page.setPage(4);
+                    expect(getResults).toHaveBeenCalledWith({"page": {"max": 10, "mode": "remote", "page": 4, "pageSize": 5}});
 
-                        expect(tabulator.modules.ajax.initialize).toHaveBeenCalled();
-
-                        expect(tabulator.modules.ajax.setParams).toHaveBeenCalledWith({queryName: "test", page: 1 });
-                        expect(tabulator.modules.ajax.getData).toHaveBeenCalledWith('http://localhost:8081/results/token12345');
-                        expect(tabulator.rowManager.setData).toHaveBeenCalledWith({test: 'result'});
-
-                        tabulator.modules.ajax.setParams.mockClear();
-                        tabulator.modules.ajax.getData.mockClear();
-
-                        await tabulator.modules.page.setPage(4);
-                        
-                        expect(tabulator.modules.ajax.setParams).toHaveBeenCalledWith({page: 4, size: 5 });
-                        expect(tabulator.modules.ajax.getData).toHaveBeenCalledWith('http://localhost:8081/results/token12345');
-
-                        done();
+                    expect(tabulator.rowManager.setData).toHaveBeenCalledTimes(2);
                 });
             });
         });
