@@ -191,8 +191,6 @@ Tabulator.prototype.defaultOptions = {
 	paginationDataReceived:{}, //pagination data received from the server
 	paginationAddRow: "page", //add rows on table or page
 
-	queryInfoVisible: false,
-
 	dataSource: false,
 
 	ajaxURL:false, //url for ajax loading
@@ -210,25 +208,6 @@ Tabulator.prototype.defaultOptions = {
 	ajaxProgressiveLoadDelay:0, //delay between requests
 	ajaxProgressiveLoadScrollMargin:0, //margin before scroll begins
 
-	queryType: 'ajax',
-	
-	asyncQuery: false,
-	asyncRequestGenerator: false,
-	asyncRequestResponseParser: false,
-	asyncStatusGenerator: false,
-	asyncStatusResponseParser: false,
-	asyncResultsGenerator: false,
-	asyncResultsResponseParse: false,
-	asyncAjaxStatusPollInterval: 2000,
-	
-	// AjaxInitRequestFunc: false,
-	// asyncAjaxInitResponse: false,
-	// asyncAjaxStatusRequestFunc: false,
-	// asyncAjaxStatusResponse: false,
-	// asyncAjaxQueryRequestFunc: false,
-	// asyncAjaxQueryResponse: false,
-	// asyncAjaxResultsRequestFunc: false,
-	
 	groupBy:false, //enable table grouping and set field to group by
 	groupStartOpen:true, //starting state of group
 	groupValues:false,

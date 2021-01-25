@@ -6650,10 +6650,6 @@ DataManager.prototype.initialize = _asyncToGenerator( /*#__PURE__*/regeneratorRu
 						// The query should just request paging params from the mod (If present)
 						if (_this24.table.options.pagination && _this24.table.modExists('page')) {
 							pageMod.reset(true, true);
-
-							if (dataSourceOptions.getStatusHTML) {
-								pageMod.setQueryInfo(dataSourceOptions.getStatusHTML.call(_this24, { state: 'Initialise', count: 0 }));
-							}
 							pageMod.setPage(_this24.table.options.paginationInitialPage || 1).then(function () {}).catch(function () {});
 							pageMod._setPageButtons();
 						} else {
@@ -6712,14 +6708,8 @@ DataManager.prototype.updatePageCount = function (status) {
 		var pageMod = this.table.modules.page;
 		pageMod.setMaxRows(count);
 
-		if (dataSourceOptions.getStatusHTML) {
-
-			var finished = false;
-			if (state === this.responseCodes.COMPLETE || state === this.responseCodes.ERRORED) {
-				finished = true;
-			}
-
-			pageMod.setQueryInfo(dataSourceOptions.getStatusHTML.call(this, { count: count, state: state, finished: finished }));
+		if (state === this.responseCodes.COMPLETE || state === this.responseCodes.ERRORED) {
+			dataSourceOptions.onFinished.call(this, { finished: true });
 		}
 
 		pageMod._setPageButtons();
@@ -6980,8 +6970,6 @@ Tabulator.prototype.defaultOptions = {
 	paginationDataReceived: {}, //pagination data received from the server
 	paginationAddRow: "page", //add rows on table or page
 
-	queryInfoVisible: false,
-
 	dataSource: false,
 
 	ajaxURL: false, //url for ajax loading
@@ -6998,25 +6986,6 @@ Tabulator.prototype.defaultOptions = {
 	ajaxProgressiveLoad: false, //progressive loading
 	ajaxProgressiveLoadDelay: 0, //delay between requests
 	ajaxProgressiveLoadScrollMargin: 0, //margin before scroll begins
-
-	queryType: 'ajax',
-
-	asyncQuery: false,
-	asyncRequestGenerator: false,
-	asyncRequestResponseParser: false,
-	asyncStatusGenerator: false,
-	asyncStatusResponseParser: false,
-	asyncResultsGenerator: false,
-	asyncResultsResponseParse: false,
-	asyncAjaxStatusPollInterval: 2000,
-
-	// AjaxInitRequestFunc: false,
-	// asyncAjaxInitResponse: false,
-	// asyncAjaxStatusRequestFunc: false,
-	// asyncAjaxStatusResponse: false,
-	// asyncAjaxQueryRequestFunc: false,
-	// asyncAjaxQueryResponse: false,
-	// asyncAjaxResultsRequestFunc: false,
 
 	groupBy: false, //enable table grouping and set field to group by
 	groupStartOpen: true, //starting state of group

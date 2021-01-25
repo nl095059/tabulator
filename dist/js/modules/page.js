@@ -50,11 +50,6 @@ Page.prototype.createElements = function () {
 	this.lastBut = button.cloneNode(true);
 	this.lastBut.setAttribute("data-page", "last");
 
-	if (this.table.options.queryInfoVisible) {
-		this.queryInfo = document.createElement("span");
-		this.queryInfo.classList.add("query-info");
-	}
-
 	if (this.table.options.paginationSizeSelector) {
 		this.pageSizeSelect = document.createElement("select");
 		this.pageSizeSelect.classList.add("tabulator-page-size");
@@ -197,9 +192,6 @@ Page.prototype.initialize = function (hidden) {
 	}
 
 	//append to DOM
-	if (self.queryInfo) {
-		self.element.appendChild(self.queryInfo);
-	}
 	self.element.appendChild(self.firstBut);
 	self.element.appendChild(self.prevBut);
 	self.element.appendChild(self.pagesElement);
@@ -291,12 +283,6 @@ Page.prototype.setMaxPage = function (max) {
 	if (this.page > this.max) {
 		this.page = this.max;
 		this.trigger();
-	}
-};
-
-Page.prototype.setQueryInfo = function (infoHTML) {
-	if (this.queryInfo) {
-		this.queryInfo.innerHTML = infoHTML;
 	}
 };
 

@@ -10,7 +10,7 @@ var MockTabulator = function MockTabulator(element, options) {
     };
 
     this.dataManager = {
-        getData: jest.fn()
+        getResults: jest.fn()
     };
 
     var tableElement = document.createElement('span');
@@ -157,7 +157,7 @@ describe('Pagination', function () {
             });
             pageMod = tabulator.modules.page;
 
-            tabulator.dataManager.getData.mockImplementation(function () {
+            tabulator.dataManager.getResults.mockImplementation(function () {
                 return new Promise(function (resolve, reject) {
                     return resolve();
                 });
@@ -188,7 +188,7 @@ describe('Pagination', function () {
                 paginationButtonCount: 5
             });
             pageMod = tabulator.modules.page;
-            tabulator.dataManager.getData.mockImplementation(function () {
+            tabulator.dataManager.getResults.mockImplementation(function () {
                 return new Promise(function (resolve, reject) {
                     return resolve();
                 });
@@ -249,7 +249,7 @@ describe('Pagination', function () {
             });
             pageMod = tabulator.modules.page;
 
-            tabulator.dataManager.getData.mockImplementation(function () {
+            tabulator.dataManager.getResults.mockImplementation(function () {
                 return new Promise(function (resolve, reject) {
                     return resolve();
                 });

@@ -70,10 +70,6 @@ DataManager.prototype.initialize = async function(){
 		// The query should just request paging params from the mod (If present)
 		if (this.table.options.pagination && this.table.modExists('page')) {
 			pageMod.reset(true, true);
-
-			if (dataSourceOptions.getStatusHTML) {
-				pageMod.setQueryInfo(dataSourceOptions.getStatusHTML.call(this, { state: 'Initialise', count: 0 }));
-			}
 			pageMod.setPage(this.table.options.paginationInitialPage || 1).then(() => { }).catch(() => { });
 			pageMod._setPageButtons();
 		} else {
@@ -119,17 +115,11 @@ DataManager.prototype.updatePageCount = function(status) {
 		const pageMod = this.table.modules.page;
 		pageMod.setMaxRows(count);
 
-		if (dataSourceOptions.getStatusHTML) {
-
-			let finished = false;
-			if (state === this.responseCodes.COMPLETE
-				|| state === this.responseCodes.ERRORED) {
-				finished = true;
-			}
-
-			pageMod.setQueryInfo(dataSourceOptions.getStatusHTML.call(this, { count, state, finished}));
+		if (state === this.responseCodes.COMPLETE
+			|| state === this.responseCodes.ERRORED) {
+			dataSourceOptions.onFinished.call(this, { finished: true});
 		}
- 
+
 		pageMod._setPageButtons();
 	}
 }
