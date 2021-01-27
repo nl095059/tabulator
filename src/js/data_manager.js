@@ -7,16 +7,22 @@ ObjectData.prototype.initialize = function(datasourceOptions) {
 	this.datasourceOptions = datasourceOptions;
 };
 
-ObjectData.prototype.initializeQuery = async function(viewParams) {
-	return this.datasourceOptions.async.initializeQuery.call(this, viewParams);
+ObjectData.prototype.initializeQuery = function(viewParams) {
+	return new Promise((resolve) => {
+		resolve(this.datasourceOptions.async.initializeQuery.call(this, viewParams));
+	});
 }
 
-ObjectData.prototype.getStatus = async function() {
-	return this.datasourceOptions.async.getStatus.call(this);
+ObjectData.prototype.getStatus = function() {
+	return new Promise((resolve) => {
+		resolve(this.datasourceOptions.async.getStatus.call(this));
+	});
 };
 
-ObjectData.prototype.getResults = async function(viewParams) {
-	return this.datasourceOptions.async.getResults.call(this, viewParams);
+ObjectData.prototype.getResults = function(viewParams) {
+	return new Promise((resolve) => {
+		resolve(this.datasourceOptions.async.getResults.call(this, viewParams));
+	});
 };
 
 ObjectData.prototype.validateParams = function(datasourceOptions) {
@@ -46,35 +52,38 @@ DataManager.prototype.responseCodes = {
 	ERRORED: 'Error'
 };
 
-DataManager.prototype.initialize = async function(){
-	const dataSourceOptions = this.table.options.dataSource;
-	const pageMod = this.table.modules.page;
+DataManager.prototype.initialize = function() {
+	return new Promise((resolve) => {
+		const dataSourceOptions = this.table.options.dataSource;
+		const pageMod = this.table.modules.page;
 
-	switch (dataSourceOptions.type) {
-		case 'object':
-			this.dataSource = new ObjectData(dataSourceOptions);
-			break;
-	}
-
-	this.dataSource.initialize(dataSourceOptions);
-
-	return this.dataSource.initializeQuery(dataSourceOptions, this.getViewParams()).then((token) => {
-		this.token = token;
-
-		if (dataSourceOptions.async) {
-			// If asynchronous, then start a poller
-			this.initializePoller(dataSourceOptions.async.statusPollInterval, token);
+		switch (dataSourceOptions.type) {
+			case 'object':
+				this.dataSource = new ObjectData(dataSourceOptions);
+				break;
 		}
 
-		// If we have paging mod and we want paging initialise it here.
-		// The query should just request paging params from the mod (If present)
-		if (this.table.options.pagination && this.table.modExists('page')) {
-			pageMod.reset(true, true);
-			pageMod.setPage(this.table.options.paginationInitialPage || 1).then(() => { }).catch(() => { });
-			pageMod._setPageButtons();
-		} else {
-			pageMod.setPage(1);
-		}
+		this.dataSource.initialize(dataSourceOptions);
+
+		return this.dataSource.initializeQuery(dataSourceOptions, this.getViewParams()).then((token) => {
+			this.token = token;
+
+			if (dataSourceOptions.async) {
+				// If asynchronous, then start a poller
+				this.initializePoller(dataSourceOptions.async.statusPollInterval, token);
+			}
+
+			// If we have paging mod and we want paging initialise it here.
+			// The query should just request paging params from the mod (If present)
+			if (this.table.options.pagination && this.table.modExists('page')) {
+				pageMod.reset(true, true);
+				pageMod.setPage(this.table.options.paginationInitialPage || 1).then(() => { }).catch(() => { });
+				pageMod._setPageButtons();
+			} else {
+				pageMod.setPage(1);
+			}
+			resolve();
+		});
 	});
 };
 
@@ -150,19 +159,22 @@ DataManager.prototype.getStatus = function (token) {
 	});
 };
 
-DataManager.prototype.getResults = async function() {
-	var viewParams = this.getViewParams();
-	this.dataSource.getResults(viewParams)
-		.then((data) => {
-			var left = this.table.rowManager.scrollLeft;
-			this.table.rowManager.setData(data);
-			this.table.rowManager.scrollHorizontal(left);
-			this.table.columnManager.scrollHorizontal(left);
+DataManager.prototype.getResults = function() {
+	return new Promise((resolve) => {
+		var viewParams = this.getViewParams();
+		this.dataSource.getResults(viewParams)
+			.then((data) => {
+				var left = this.table.rowManager.scrollLeft;
+				this.table.rowManager.setData(data);
+				this.table.rowManager.scrollHorizontal(left);
+				this.table.columnManager.scrollHorizontal(left);
 
-			if (this.table.options.pageLoaded) {
-				this.table.options.pageLoaded.call(this.table, viewParams.page.page);
-			}
-		})
+				if (this.table.options.pageLoaded) {
+					this.table.options.pageLoaded.call(this.table, viewParams.page.page);
+				}
+				resolve();
+			});
+	});
 };
 
 DataManager.prototype.abort = function() {

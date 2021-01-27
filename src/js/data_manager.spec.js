@@ -128,38 +128,41 @@ describe('Datamanager', () => {
             });
         
             describe('Initialisation', () => {
-                test('initiate is called', async () => {
+                test('initiate is called', (done) => {
                     
-                    await tabulator.dataManager.initialize();
-                    
-                    expect(tabulator.dataManager.dataSource instanceof ObjectData).toEqual(true);
-                    expect(initializeQuery).toHaveBeenCalled();
+                    tabulator.dataManager.initialize().then(() => {
+                        expect(tabulator.dataManager.dataSource instanceof ObjectData).toEqual(true);
+                        expect(initializeQuery).toHaveBeenCalled();
+                        done();
+                    });
                 });
 
-                test('first page of results is requested', async () => {
+                test('first page of results is requested', (done) => {
                     initializeQuery.mockReturnValue('token12345');
                     getResults.mockReturnValue([{test: 'result'}, {test: 'result2'}]);
 
-                    await tabulator.dataManager.initialize();
+                    tabulator.dataManager.initialize().then(() => {
+                        expect(initializeQuery).toHaveBeenCalled();
 
-                    expect(initializeQuery).toHaveBeenCalled();
-
-                    expect(getResults).toHaveBeenCalledWith({ page: { max: 1, mode: 'remote', page: 1, pageSize: 5 } });
-                    expect(tabulator.rowManager.setData).toHaveBeenCalledWith([{ test: 'result' }, { test: 'result2' }]);
+                        expect(getResults).toHaveBeenCalledWith({ page: { max: 1, mode: 'remote', page: 1, pageSize: 5 } });
+                        expect(tabulator.rowManager.setData).toHaveBeenCalledWith([{ test: 'result' }, { test: 'result2' }]);
+                        done();
+                    });
                 });
             });
 
             describe('polling', () => {
                 describe('successful query initialise', () => {
-                    test('starts the poller', async () => {
+                    test('starts the poller', (done) => {
                         initializeQuery.mockReturnValue('token12345');
 
                         tabulator.dataManager.initializePoller = jest.fn();
 
-                        await tabulator.dataManager.initialize();
-                        
-                        expect(initializeQuery).toHaveBeenCalled();
-                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                        tabulator.dataManager.initialize().then(() => {
+                            expect(initializeQuery).toHaveBeenCalled();
+                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                            done();
+                        });                        
                     });
                 });
 
@@ -178,38 +181,40 @@ describe('Datamanager', () => {
                         initializeQuery.mockReturnValue('token12345');
                     });
 
-                    test('is stopped if the query status is errored', async () => {
+                    test('is stopped if the query status is errored', (done) => {
                         setupMocks({ state: "Error", count: 0});
 
-                        await tabulator.dataManager.initialize();
+                        tabulator.dataManager.initialize().then(() => {
+                            expect(initializeQuery).toHaveBeenCalled();
 
-                        expect(initializeQuery).toHaveBeenCalled();
-
-                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
-                        expect(getStatus).toHaveBeenCalled();
-                        expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
+                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                            expect(getStatus).toHaveBeenCalled();
+                            expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
+                            done();
+                        });
                     });
 
-                    test('is stopped if the query succeeds', async () => {
+                    test('is stopped if the query succeeds', (done) => {
                         setupMocks({ state: "Finished", count: 0});
 
-                        await tabulator.dataManager.initialize();
-                        
-
-                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
-                        expect(getStatus).toHaveBeenCalled();
-                        expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
+                        tabulator.dataManager.initialize().then(() => {
+                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                            expect(getStatus).toHaveBeenCalled();
+                            expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
+                            done();
+                        });
                     });
 
-                    test('is stopped if the query is cancelled', async () => {
+                    test('is stopped if the query is cancelled', (done) => {
                         setupMocks({ state: "In Progress", count: 0});
 
-                        await tabulator.dataManager.initialize();
-
-                        expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
-                        expect(tabulator.dataManager.clearPoller).not.toHaveBeenCalled();
-                        tabulator.dataManager.abort();
-                        expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
+                        tabulator.dataManager.initialize().then(() => {
+                            expect(tabulator.dataManager.initializePoller).toHaveBeenCalled();
+                            expect(tabulator.dataManager.clearPoller).not.toHaveBeenCalled();
+                            tabulator.dataManager.abort();
+                            expect(tabulator.dataManager.clearPoller).toHaveBeenCalled();
+                            done();
+                        });
                     });
                 });
             });
@@ -226,19 +231,22 @@ describe('Datamanager', () => {
                     getStatus.mockImplementation(() => statusResponse);
                 }
 
-                test('Retrieves a given page of results', async () => {
+                test('Retrieves a given page of results', (done) => {
                     setupMocks({ state: "Finished", count: 50});
 
-                    await tabulator.dataManager.initialize();
-                    expect(getResults).toHaveBeenCalledWith({"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
-                    expect(getStatus).toHaveBeenCalled();
+                    tabulator.dataManager.initialize().then(() => {
+                        expect(getResults).toHaveBeenCalledWith({"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
+                        expect(getStatus).toHaveBeenCalled();
 
-                    expect(tabulator.rowManager.setData).toHaveBeenCalledTimes(1);
-                    
-                    await tabulator.modules.page.setPage(4);
-                    expect(getResults).toHaveBeenCalledWith({"page": {"max": 10, "mode": "remote", "page": 4, "pageSize": 5}});
+                        expect(tabulator.rowManager.setData).toHaveBeenCalledTimes(1);
+                        
+                        tabulator.modules.page.setPage(4).then(() => {
+                            expect(getResults).toHaveBeenCalledWith({"page": {"max": 10, "mode": "remote", "page": 4, "pageSize": 5}});
 
-                    expect(tabulator.rowManager.setData).toHaveBeenCalledTimes(2);
+                            expect(tabulator.rowManager.setData).toHaveBeenCalledTimes(2);
+                            done();
+                        });
+                    });
                 });
             });
         });
