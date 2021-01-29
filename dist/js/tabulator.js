@@ -6566,7 +6566,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 	ObjectData.prototype.validateParams = function (datasourceOptions) {
 		if (!datasourceOptions.async) {
-			throw new Error('Object datasource only supports async querying at present');
+			throw new Error('Object datasource requires mandatory async property');
 		}
 		if (!datasourceOptions.async.initializeQuery) {
 			throw new Error('Object datasource has not been passed an initQuery callback');
@@ -6733,6 +6733,9 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		this.clearPoller();
 	};
 
+	// Because Tabulator is not currently exposing this as a module, we have to do this to be able to run the tests.
+	// To expose as a module the following needs to be uncommented.
+	//
 	// if (module) {
 	// 	module.exports = {
 	// 		DataManager,

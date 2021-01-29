@@ -66,15 +66,6 @@ describe('Pagination', () => {
         return tabulator;
     }
 
-    beforeEach(() => {
-        // var module = tabulator.getModule('page');
-        // pageModule = new module(tabulator);
-    });
-
-    afterEach(() => {
-
-    });
-
     describe('Pagination Size Selector', () => {
         test('it is instantiated when set to true', () => {
             var tabulator = createTable({
@@ -232,6 +223,18 @@ describe('Pagination', () => {
             expect(pageMod.size).toEqual(10);
         });
 
+        test('Does not set the size if passsed a zero value', () => {
+            expect(pageMod.size).toEqual(10);
+            pageMod.setPageSize(0);
+            expect(pageMod.size).toEqual(10);
+        });
+
+        test('Does not set the size if passsed a negative value', () => {
+            expect(pageMod.size).toEqual(10);
+            pageMod.setPageSize(-5);
+            expect(pageMod.size).toEqual(10);
+        });        
+
     });
 
     describe('buttons', () => {
@@ -249,28 +252,51 @@ describe('Pagination', () => {
             });
         });
 
-        test('first and previous get disabled on the first page', () => {
+        test('first is disabled on the first page', () => {
             pageMod.setMaxPage(10);
             pageMod._setPageButtons();
 
             expect(pageMod.firstBut.disabled).toEqual(true);
+        });
+
+        test('previous is disabled on the first page', () => {
+            pageMod.setMaxPage(10);
+            pageMod._setPageButtons();
+
             expect(pageMod.prevBut.disabled).toEqual(true);
+        });
+
+        test('last and next are enabled on the first page', () => {
+            pageMod.setMaxPage(10);
+            pageMod._setPageButtons();
 
             expect(pageMod.lastBut.disabled).toEqual(false);
             expect(pageMod.nextBut.disabled).toEqual(false);
-
         });
 
-        test('last and next get disabled on the last page', () => {
+        test('last is disabled on the last page', () => {
+            pageMod.setMaxPage(10);
+            pageMod.setPage(10);
+            pageMod._setPageButtons();
+
+            expect(pageMod.lastBut.disabled).toEqual(true);
+        });
+
+        test('next is disabled on the last page', () => {
+            pageMod.setMaxPage(10);
+            pageMod.setPage(10);
+            pageMod._setPageButtons();
+
+            expect(pageMod.nextBut.disabled).toEqual(true);
+        });
+
+        test('first and previous are enabled on the last page', () => {
             pageMod.setMaxPage(10);
             pageMod.setPage(10);
             pageMod._setPageButtons();
 
             expect(pageMod.firstBut.disabled).toEqual(false);
             expect(pageMod.prevBut.disabled).toEqual(false);
-
-            expect(pageMod.lastBut.disabled).toEqual(true);
-            expect(pageMod.nextBut.disabled).toEqual(true);
         });
     });
 });

@@ -1,4 +1,5 @@
-
+//IMPORTANT: To run these tests, data_manager.js needs to be exposed as a module. To do this you need to uncomment the few lines of code
+// at the end of data_manager.js and then run the tests.
 
 var { DataManager, ObjectData } = require('./data_manager.js');
 window.DataManager = DataManager;
@@ -121,10 +122,6 @@ describe('Datamanager', () => {
             beforeEach(() => {
                 tabulator = createTable({
                 });
-            });
-        
-            afterEach(() => {
-        
             });
         
             describe('Initialisation', () => {
