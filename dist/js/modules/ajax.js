@@ -79,6 +79,56 @@ Ajax.prototype.initialize = function () {
 	}
 };
 
+Ajax.prototype.initializeQuery = function (url, viewPort) {
+	var _this = this;
+
+	return this.loaderPromise(url, this.config, this.params).then(function (data) {
+		return _this.table.options.dataSource.async.initResponse(data);
+	}).catch(function (error) {
+		return error;
+	});
+};
+
+Ajax.prototype.getStatus = function (url) {
+	var table = this.table;
+	return this.loaderPromise(url, this.config, this.params).then(function (data) {
+		return table.options.dataSource.async.statusResponse(data);
+	}).catch(function (error) {
+		return error;
+	});
+};
+
+Ajax.prototype.getData = function (url) {
+	var _this2 = this;
+
+	var table = this.table;
+
+	this.loading = true;
+	this.showLoader();
+
+	return this.loaderPromise(url, this.config, this.params).then(function (data) {
+
+		_this2.hideLoader();
+		_this2.loading = false;
+
+		return table.options.dataSource.async.resultsResponse(data);
+	}).catch(function (error) {
+		_this2.showError();
+
+		setTimeout(function () {
+			this.hideLoader();
+		}, 3000);
+
+		_this2.loading = false;
+
+		return error;
+	});
+};
+
+Ajax.prototype.getResults = function (inPosition, columnsChanged) {
+	return this._loadDataStandard(inPosition, columnsChanged);
+};
+
 Ajax.prototype.createLoaderElement = function () {
 	var el = document.createElement("div");
 	el.classList.add("tabulator-loader");
@@ -182,11 +232,11 @@ Ajax.prototype._loadDataProgressive = function () {
 };
 
 Ajax.prototype._loadDataStandard = function (inPosition, columnsChanged) {
-	var _this = this;
+	var _this3 = this;
 
 	return new Promise(function (resolve, reject) {
-		_this.sendRequest(inPosition).then(function (data) {
-			_this.table.rowManager.setData(data, inPosition, columnsChanged).then(function () {
+		_this3.sendRequest(inPosition).then(function (data) {
+			_this3.table.rowManager.setData(data, inPosition, columnsChanged).then(function () {
 				resolve();
 			}).catch(function (e) {
 				reject(e);
@@ -231,7 +281,7 @@ Ajax.prototype.serializeParams = function (params) {
 
 //send ajax request
 Ajax.prototype.sendRequest = function (silent) {
-	var _this2 = this;
+	var _this4 = this;
 
 	var self = this,
 	    url = self.url,
@@ -245,7 +295,7 @@ Ajax.prototype.sendRequest = function (silent) {
 	self._loadDefaultConfig();
 
 	return new Promise(function (resolve, reject) {
-		if (self.table.options.ajaxRequesting.call(_this2.table, self.url, self.params) !== false) {
+		if (self.table.options.ajaxRequesting.call(_this4.table, self.url, self.params) !== false) {
 
 			self.loading = true;
 
@@ -253,7 +303,7 @@ Ajax.prototype.sendRequest = function (silent) {
 				self.showLoader();
 			}
 
-			_this2.loaderPromise(url, self.config, self.params).then(function (data) {
+			_this4.loaderPromise(url, self.config, self.params).then(function (data) {
 				if (requestNo === self.requestOrder) {
 					if (self.table.options.ajaxResponse) {
 						data = self.table.options.ajaxResponse.call(self.table, self.url, self.params, data);

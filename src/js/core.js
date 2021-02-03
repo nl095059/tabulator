@@ -9,6 +9,7 @@
 /*=include row.js */
 /*=include cell.js */
 /*=include footer_manager.js */
+/*=include data_manager.js */
 
 var Tabulator = function(element, options){
 
@@ -18,6 +19,8 @@ var Tabulator = function(element, options){
 	this.rowManager = null; //hold Row Manager
 	this.footerManager = null; //holder Footer Manager
 	this.vdomHoz  = null; //holder horizontal virtual dom
+
+	this.dataManager = null;
 
 
 	this.browser = ""; //hold current browser type
@@ -188,6 +191,8 @@ Tabulator.prototype.defaultOptions = {
 	paginationDataSent:{}, //pagination data sent to the server
 	paginationDataReceived:{}, //pagination data received from the server
 	paginationAddRow: "page", //add rows on table or page
+
+	dataSource: false,
 
 	ajaxURL:false, //url for ajax loading
 	ajaxURLGenerator:false,
@@ -539,6 +544,8 @@ Tabulator.prototype._create = function(){
 	this.columnManager.setRowManager(this.rowManager);
 	this.rowManager.setColumnManager(this.columnManager);
 
+	this.dataManager = new DataManager(this);
+
 	if(this.options.virtualDomHoz){
 		this.vdomHoz = new VDomHoz(this);
 	}
@@ -709,11 +716,6 @@ Tabulator.prototype._buildElement = function(){
 		});
 	}
 
-
-	if(this.modExists("ajax")){
-		mod.ajax.initialize();
-	}
-
 	if(options.pagination && this.modExists("page", true)){
 		mod.page.initialize();
 	}
@@ -746,49 +748,7 @@ Tabulator.prototype._buildElement = function(){
 };
 
 Tabulator.prototype._loadInitialData = function(){
-	var self = this;
-
-	if(self.options.pagination && self.modExists("page")){
-		self.modules.page.reset(true, true);
-
-		if(self.options.pagination == "local"){
-			if(self.options.data.length){
-				self.rowManager.setData(self.options.data, false, true);
-			}else{
-				if((self.options.ajaxURL || self.options.ajaxURLGenerator) && self.modExists("ajax")){
-					self.modules.ajax.loadData(false, true).then(()=>{}).catch(()=>{
-						if(self.options.paginationInitialPage){
-							self.modules.page.setPage(self.options.paginationInitialPage);
-						}
-					});
-
-					return;
-				}else{
-					self.rowManager.setData(self.options.data, false, true);
-				}
-			}
-
-			if(self.options.paginationInitialPage){
-				self.modules.page.setPage(self.options.paginationInitialPage);
-			}
-		}else{
-			if(self.options.ajaxURL){
-				self.modules.page.setPage(self.options.paginationInitialPage).then(()=>{}).catch(()=>{});
-			}else{
-				self.rowManager.setData([], false, true);
-			}
-		}
-	}else{
-		if(self.options.data.length){
-			self.rowManager.setData(self.options.data);
-		}else{
-			if((self.options.ajaxURL || self.options.ajaxURLGenerator) && self.modExists("ajax")){
-				self.modules.ajax.loadData(false, true).then(()=>{}).catch(()=>{});
-			}else{
-				self.rowManager.setData(self.options.data, false, true);
-			}
-		}
-	}
+	this.dataManager.initialize();
 };
 
 //deconstructor
@@ -809,6 +769,8 @@ Tabulator.prototype.destroy = function(){
 	this.rowManager.rows = [];
 	this.rowManager.activeRows = [];
 	this.rowManager.displayRows = [];
+
+	this.dataManager.destroy();
 
 	//clear event bindings
 	if(this.options.autoResize && this.modExists("resizeTable")){
@@ -903,72 +865,21 @@ Tabulator.prototype.setDataFromLocalFile = function(extensions){
 
 
 //load data
-Tabulator.prototype.setData = function(data, params, config){
-	if(this.modExists("ajax")){
-		this.modules.ajax.blockActiveRequest();
-	}
+Tabulator.prototype.setData = function(data){
+	this.dataManager.abort();
 
-	return this._setData(data, params, config, false, true);
+	return this._setData(data, false, true);
 };
 
-Tabulator.prototype._setData = function(data, params, config, inPosition, columnsChanged){
+Tabulator.prototype._setData = function(data, inPosition, columnsChanged){
 	var self = this;
 
-	if(typeof(data) === "string"){
-		if (data.indexOf("{") == 0 || data.indexOf("[") == 0){
-			//data is a json encoded string
-			return self.rowManager.setData(JSON.parse(data), inPosition, columnsChanged);
-		}else{
-
-			if(self.modExists("ajax", true)){
-				if(params){
-					self.modules.ajax.setParams(params);
-				}
-
-				if(config){
-					self.modules.ajax.setConfig(config);
-				}
-
-				self.modules.ajax.setUrl(data);
-
-				if(self.options.pagination == "remote" && self.modExists("page", true)){
-					self.modules.page.reset(true, true);
-					return self.modules.page.setPage(1);
-				}else{
-					//assume data is url, make ajax call to url to get data
-					return self.modules.ajax.loadData(inPosition, columnsChanged);
-				}
-			}
-		}
-	}else{
-		if(data){
-			//asume data is already an object
-			return self.rowManager.setData(data, inPosition, columnsChanged);
-		}else{
-
-			//no data provided, check if ajaxURL is present;
-			if(self.modExists("ajax") && (self.modules.ajax.getUrl || self.options.ajaxURLGenerator)){
-
-				if(self.options.pagination == "remote" && self.modExists("page", true)){
-					self.modules.page.reset(true, true);
-					return self.modules.page.setPage(1);
-				}else{
-					return self.modules.ajax.loadData(inPosition, columnsChanged);
-				}
-
-			}else{
-				//empty data
-				return self.rowManager.setData([], inPosition, columnsChanged);
-			}
-		}
-	}
+	self.dataManager.getResults(inPosition, columnsChanged);
 };
 
 //clear data
 Tabulator.prototype.clearData = function(){
-	if(this.modExists("ajax")){
-		this.modules.ajax.blockActiveRequest();
-	}
+	this.dataManager.abort();
 
 	this.rowManager.clearData();
 };
@@ -1031,12 +942,10 @@ Tabulator.prototype.getAjaxUrl = function(){
 };
 
 //replace data, keeping table in position with same sort
-Tabulator.prototype.replaceData = function(data, params, config){
-	if(this.modExists("ajax")){
-		this.modules.ajax.blockActiveRequest();
-	}
+Tabulator.prototype.replaceData = function(data){
+	this.dataManager.abort();
 
-	return this._setData(data, params, config, true);
+	return this._setData(data, true);
 };
 
 
@@ -1046,9 +955,8 @@ Tabulator.prototype.updateData = function(data){
 	var responses = 0;
 
 	return new Promise((resolve, reject) => {
-		if(this.modExists("ajax")){
-			this.modules.ajax.blockActiveRequest();
-		}
+		this.dataManager.abort();
+
 
 		if(typeof data === "string"){
 			data = JSON.parse(data);
@@ -1081,9 +989,8 @@ Tabulator.prototype.updateData = function(data){
 
 Tabulator.prototype.addData = function(data, pos, index){
 	return new Promise((resolve, reject) => {
-		if(this.modExists("ajax")){
-			this.modules.ajax.blockActiveRequest();
-		}
+		this.dataManager.abort();
+
 
 		if(typeof data === "string"){
 			data = JSON.parse(data);
@@ -1114,9 +1021,7 @@ Tabulator.prototype.updateOrAddData = function(data){
 	responses = 0;
 
 	return new Promise((resolve, reject) => {
-		if(this.modExists("ajax")){
-			this.modules.ajax.blockActiveRequest();
-		}
+		this.dataManager.abort();
 
 		if(typeof data === "string"){
 			data = JSON.parse(data);

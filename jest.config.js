@@ -3,5 +3,11 @@ module.exports = {
     collectCoverageFrom: [
         'src/**/*.js'
     ],
-    silent: false
+    transform: {
+        '^.+\\.js?$': 'babel-jest'
+    },
+    transformIgnorePatterns: [
+        '<rootDir>/node_modules/(?!lodash-es)'
+    ],
+    silent: true
 };

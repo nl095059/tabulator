@@ -9,7 +9,7 @@ var Page = function Page(table) {
 
 	this.size = 0;
 	this.page = 1;
-	this.count = 5;
+	this.paginationButtonCount = 5;
 	this.max = 1;
 
 	this.displayIndex = 0; //index in display pipeline
@@ -17,9 +17,6 @@ var Page = function Page(table) {
 	this.initialLoad = true;
 
 	this.pageSizes = [];
-
-	this.dataReceivedNames = {};
-	this.dataSentNames = {};
 
 	this.createElements();
 };
@@ -115,13 +112,6 @@ Page.prototype.initialize = function (hidden) {
 	    pageSelectLabel,
 	    testElRow,
 	    testElCell;
-
-	//update param names
-	this.dataSentNames = Object.assign({}, this.paginationDataSentNames);
-	this.dataSentNames = Object.assign(this.dataSentNames, this.table.options.paginationDataSent);
-
-	this.dataReceivedNames = Object.assign({}, this.paginationDataReceivedNames);
-	this.dataReceivedNames = Object.assign(this.dataReceivedNames, this.table.options.paginationDataReceived);
 
 	//build pagination element
 
@@ -236,7 +226,9 @@ Page.prototype.initialize = function (hidden) {
 	}
 
 	// self.page = self.table.options.paginationInitialPage || 1;
-	self.count = self.table.options.paginationButtonCount;
+	if (self.table.options.paginationButtonCount) {
+		self.paginationButtonCount = self.table.options.paginationButtonCount;
+	}
 
 	self.generatePageSizeSelectList();
 };
@@ -303,19 +295,15 @@ Page.prototype.setPage = function (page) {
 	switch (page) {
 		case "first":
 			return this.setPage(1);
-			break;
 
 		case "prev":
 			return this.previousPage();
-			break;
 
 		case "next":
 			return this.nextPage();
-			break;
 
 		case "last":
 			return this.setPage(this.max);
-			break;
 	}
 
 	return new Promise(function (resolve, reject) {
@@ -386,10 +374,10 @@ Page.prototype.setPageSize = function (size) {
 Page.prototype._setPageButtons = function () {
 	var self = this;
 
-	var leftSize = Math.floor((this.count - 1) / 2);
-	var rightSize = Math.ceil((this.count - 1) / 2);
-	var min = this.max - this.page + leftSize + 1 < this.count ? this.max - this.count + 1 : Math.max(this.page - leftSize, 1);
-	var max = this.page <= rightSize ? Math.min(this.count, this.max) : Math.min(this.page + rightSize, this.max);
+	var leftSize = Math.floor((this.paginationButtonCount - 1) / 2);
+	var rightSize = Math.ceil((this.paginationButtonCount - 1) / 2);
+	var min = this.max - this.page + leftSize + 1 < this.paginationButtonCount ? this.max - this.paginationButtonCount + 1 : Math.max(this.page - leftSize, 1);
+	var max = this.page <= rightSize ? Math.min(this.paginationButtonCount, this.max) : Math.min(this.page + rightSize, this.max);
 
 	while (self.pagesElement.firstChild) {
 		self.pagesElement.removeChild(self.pagesElement.firstChild);
@@ -493,6 +481,15 @@ Page.prototype.nextPage = function () {
 	});
 };
 
+Page.prototype.getParams = function () {
+	return {
+		pageSize: this.size,
+		max: this.max,
+		page: this.page,
+		mode: this.mode
+	};
+};
+
 //return current page number
 Page.prototype.getPage = function () {
 	return this.page;
@@ -544,154 +541,7 @@ Page.prototype.getRows = function (data) {
 };
 
 Page.prototype.trigger = function () {
-	var _this6 = this;
-
-	var left;
-
-	return new Promise(function (resolve, reject) {
-
-		switch (_this6.mode) {
-			case "local":
-				left = _this6.table.rowManager.scrollLeft;
-
-				_this6.table.rowManager.refreshActiveData("page");
-				_this6.table.rowManager.scrollHorizontal(left);
-
-				_this6.table.options.pageLoaded.call(_this6.table, _this6.getPage());
-				resolve();
-				break;
-
-			case "remote":
-			case "progressive_load":
-			case "progressive_scroll":
-				_this6.table.modules.ajax.blockActiveRequest();
-				_this6._getRemotePage().then(function () {
-					resolve();
-				}).catch(function () {
-					reject();
-				});
-				break;
-
-			default:
-				console.warn("Pagination Error - no such pagination mode:", _this6.mode);
-				reject();
-		}
-	});
-};
-
-Page.prototype._getRemotePage = function () {
-	var _this7 = this;
-
-	var self = this,
-	    oldParams,
-	    pageParams;
-
-	return new Promise(function (resolve, reject) {
-
-		if (!self.table.modExists("ajax", true)) {
-			reject();
-		}
-
-		//record old params and restore after request has been made
-		oldParams = Tabulator.prototype.helpers.deepClone(self.table.modules.ajax.getParams() || {});
-		pageParams = self.table.modules.ajax.getParams();
-
-		//configure request params
-		pageParams[_this7.dataSentNames.page] = self.page;
-
-		//set page size if defined
-		if (_this7.size) {
-			pageParams[_this7.dataSentNames.size] = _this7.size;
-		}
-
-		//set sort data if defined
-		if (_this7.table.options.ajaxSorting && _this7.table.modExists("sort")) {
-			var sorters = self.table.modules.sort.getSort();
-
-			sorters.forEach(function (item) {
-				delete item.column;
-			});
-
-			pageParams[_this7.dataSentNames.sorters] = sorters;
-		}
-
-		//set filter data if defined
-		if (_this7.table.options.ajaxFiltering && _this7.table.modExists("filter")) {
-			var filters = self.table.modules.filter.getFilters(true, true);
-			pageParams[_this7.dataSentNames.filters] = filters;
-		}
-
-		self.table.modules.ajax.setParams(pageParams);
-
-		self.table.modules.ajax.sendRequest(_this7.progressiveLoad).then(function (data) {
-			self._parseRemoteData(data);
-			resolve();
-		}).catch(function (e) {
-			reject();
-		});
-
-		self.table.modules.ajax.setParams(oldParams);
-	});
-};
-
-Page.prototype._parseRemoteData = function (data) {
-	var self = this,
-	    left,
-	    data,
-	    margin;
-
-	if (typeof data[this.dataReceivedNames.last_page] === "undefined") {
-		console.warn("Remote Pagination Error - Server response missing '" + this.dataReceivedNames.last_page + "' property");
-	}
-
-	if (data[this.dataReceivedNames.data]) {
-		this.max = parseInt(data[this.dataReceivedNames.last_page]) || 1;
-
-		if (this.progressiveLoad) {
-			switch (this.mode) {
-				case "progressive_load":
-
-					if (this.page == 1) {
-						this.table.rowManager.setData(data[this.dataReceivedNames.data], false, this.initialLoad && this.page == 1);
-					} else {
-						this.table.rowManager.addRows(data[this.dataReceivedNames.data]);
-					}
-
-					if (this.page < this.max) {
-						setTimeout(function () {
-							self.nextPage().then(function () {}).catch(function () {});
-						}, self.table.options.ajaxProgressiveLoadDelay);
-					}
-					break;
-
-				case "progressive_scroll":
-					data = this.table.rowManager.getData().concat(data[this.dataReceivedNames.data]);
-
-					this.table.rowManager.setData(data, true, this.initialLoad && this.page == 1);
-
-					margin = this.table.options.ajaxProgressiveLoadScrollMargin || this.table.rowManager.element.clientHeight * 2;
-
-					if (self.table.rowManager.element.scrollHeight <= self.table.rowManager.element.clientHeight + margin) {
-						self.nextPage().then(function () {}).catch(function () {});
-					}
-					break;
-			}
-		} else {
-			left = this.table.rowManager.scrollLeft;
-
-			this.table.rowManager.setData(data[this.dataReceivedNames.data], false, this.initialLoad && this.page == 1);
-
-			this.table.rowManager.scrollHorizontal(left);
-
-			this.table.columnManager.scrollHorizontal(left);
-
-			this.table.options.pageLoaded.call(this.table, this.getPage());
-		}
-
-		this.initialLoad = false;
-	} else {
-		console.warn("Remote Pagination Error - Server response missing '" + this.dataReceivedNames.data + "' property");
-	}
+	return this.table.dataManager.getResults();
 };
 
 //handle the footer element being redrawn
@@ -707,24 +557,6 @@ Page.prototype.footerRedraw = function () {
 			this.pagesElement.style.display = 'none';
 		}
 	}
-};
-
-//set the paramter names for pagination requests
-Page.prototype.paginationDataSentNames = {
-	"page": "page",
-	"size": "size",
-	"sorters": "sorters",
-	// "sort_dir":"sort_dir",
-	"filters": "filters"
-	// "filter_value":"filter_value",
-	// "filter_type":"filter_type",
-};
-
-//set the property names for pagination responses
-Page.prototype.paginationDataReceivedNames = {
-	"current_page": "current_page",
-	"last_page": "last_page",
-	"data": "data"
 };
 
 Tabulator.prototype.registerModule("page", Page);

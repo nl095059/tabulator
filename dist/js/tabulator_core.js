@@ -6527,6 +6527,217 @@ FooterManager.prototype.redraw = function () {
 		link.footerRedraw();
 	});
 };
+var ObjectData = function ObjectData() {
+	this.datasourceOptions = undefined;
+};
+
+ObjectData.prototype.initialize = function (datasourceOptions) {
+	this.validateParams(datasourceOptions);
+	this.datasourceOptions = datasourceOptions;
+};
+
+ObjectData.prototype.initializeQuery = function (viewParams) {
+	var _this24 = this;
+
+	return new Promise(function (resolve) {
+		resolve(_this24.datasourceOptions.async.initializeQuery.call(_this24, viewParams));
+	});
+};
+
+ObjectData.prototype.getStatus = function () {
+	var _this25 = this;
+
+	return new Promise(function (resolve) {
+		resolve(_this25.datasourceOptions.async.getStatus.call(_this25));
+	});
+};
+
+ObjectData.prototype.getResults = function (viewParams) {
+	var _this26 = this;
+
+	return new Promise(function (resolve) {
+		resolve(_this26.datasourceOptions.async.getResults.call(_this26, viewParams));
+	});
+};
+
+ObjectData.prototype.validateParams = function (datasourceOptions) {
+	if (!datasourceOptions.async) {
+		throw new Error('Object datasource requires mandatory async property');
+	}
+	if (!datasourceOptions.async.initializeQuery) {
+		throw new Error('Object datasource has not been passed an initQuery callback');
+	}
+	if (!datasourceOptions.async.getStatus) {
+		throw new Error('Object datasource has not been passed a getStatus callback');
+	}
+	if (!datasourceOptions.async.getResults) {
+		throw new Error('Object datasource has not been passed a getResults callback');
+	}
+};
+
+var DataManager = function DataManager(table) {
+	this.table = table; //hold Tabulator object
+	this.token = undefined;
+	this.dataSource = undefined;
+};
+
+DataManager.prototype.responseCodes = {
+	IN_PROGRESS: 'In Progress',
+	COMPLETE: 'Finished',
+	ERRORED: 'Error'
+};
+
+DataManager.prototype.initialize = function () {
+	var _this27 = this;
+
+	return new Promise(function (resolve) {
+		var dataSourceOptions = _this27.table.options.dataSource;
+		var pageMod = _this27.table.modules.page;
+
+		switch (dataSourceOptions.type) {
+			case 'object':
+				_this27.dataSource = new ObjectData(dataSourceOptions);
+				break;
+		}
+
+		_this27.dataSource.initialize(dataSourceOptions);
+
+		return _this27.dataSource.initializeQuery(dataSourceOptions, _this27.getViewParams()).then(function (token) {
+			_this27.token = token;
+
+			if (dataSourceOptions.async) {
+				// If asynchronous, then start a poller
+				_this27.initializePoller(dataSourceOptions.async.statusPollInterval, token);
+			}
+
+			// If we have paging mod and we want paging initialise it here.
+			// The query should just request paging params from the mod (If present)
+			if (_this27.table.options.pagination && _this27.table.modExists('page')) {
+				pageMod.reset(true, true);
+				pageMod.setPage(_this27.table.options.paginationInitialPage || 1).then(function () {}).catch(function () {});
+				pageMod._setPageButtons();
+			} else {
+				pageMod.setPage(1);
+			}
+			resolve();
+		});
+	});
+};
+
+DataManager.prototype.getViewParams = function () {
+	var dataSourceOptions = this.table.options.dataSource;
+	var params = {
+		page: this.table.modules.page.getParams()
+	};
+
+	if (dataSourceOptions.sorting && this.table.modExists("sort")) {
+		params['sort'] = this.table.modules.sort.getSort();
+	}
+
+	if (dataSourceOptions.filtering && this.table.modExists("filter")) {
+		params['filter'] = this.table.modules.filter.getFilters(true, true);
+	}
+
+	return params;
+};
+
+DataManager.prototype.initializePoller = function (pollInterval, token) {
+	var _this28 = this;
+
+	this.poller = setInterval(function () {
+		return _this28.getStatus(token);
+	}, pollInterval);
+};
+
+DataManager.prototype.clearPoller = function () {
+	if (this.poller) {
+		clearInterval(this.poller);
+		this.poller = undefined;
+	}
+};
+
+DataManager.prototype.updatePageCount = function (status) {
+	var dataSourceOptions = this.table.options.dataSource;
+
+	var count = status.count,
+	    state = status.state;
+	// Update the result counts.
+
+	if (this.table.modExists("page")) {
+		var pageMod = this.table.modules.page;
+		pageMod.setMaxRows(count);
+
+		if (state === this.responseCodes.COMPLETE || state === this.responseCodes.ERRORED) {
+			dataSourceOptions.onFinished.call(this, { finished: true });
+		}
+
+		pageMod._setPageButtons();
+	}
+};
+
+function validateStatusResponse(status) {
+	if (!status.hasOwnProperty('count') || !status.hasOwnProperty('state')) {
+		throw new Error('Status does not contain a count or state field');
+	}
+};
+
+DataManager.prototype.getStatus = function (token) {
+	var _this29 = this;
+
+	this.dataSource.getStatus(token).then(function (status) {
+
+		validateStatusResponse(status);
+
+		var state = status.state;
+		// When status is complete or errored, kill the poller
+
+		if (state === _this29.responseCodes.COMPLETE || state === _this29.responseCodes.ERRORED) {
+			_this29.clearPoller();
+		}
+
+		_this29.updatePageCount(status);
+	}).catch(function (err) {
+		console.error('Cancelling polling ', err);
+		_this29.clearPoller();
+	});
+};
+
+DataManager.prototype.getResults = function () {
+	var _this30 = this;
+
+	return new Promise(function (resolve) {
+		var viewParams = _this30.getViewParams();
+		_this30.dataSource.getResults(viewParams).then(function (data) {
+			var left = _this30.table.rowManager.scrollLeft;
+			_this30.table.rowManager.setData(data);
+			_this30.table.rowManager.scrollHorizontal(left);
+			_this30.table.columnManager.scrollHorizontal(left);
+
+			if (_this30.table.options.pageLoaded) {
+				_this30.table.options.pageLoaded.call(_this30.table, viewParams.page.page);
+			}
+			resolve();
+		});
+	});
+};
+
+DataManager.prototype.abort = function () {
+	this.clearPoller();
+};
+
+DataManager.prototype.destroy = function () {
+	this.clearPoller();
+};
+
+// Because Tabulator is not currently exposing this as a module, we have to do this to be able to run the tests.
+// To expose as a module the following needs to be uncommented.
+//
+// if (module) {
+// 	module.exports = {
+// 		DataManager,
+// 		ObjectData
+// 	};
+// }
 
 var Tabulator = function Tabulator(element, options) {
 
@@ -6537,6 +6748,7 @@ var Tabulator = function Tabulator(element, options) {
 	this.footerManager = null; //holder Footer Manager
 	this.vdomHoz = null; //holder horizontal virtual dom
 
+	this.dataManager = null;
 
 	this.browser = ""; //hold current browser type
 	this.browserSlow = false; //handle reduced functionality for slower browsers
@@ -6710,6 +6922,8 @@ Tabulator.prototype.defaultOptions = {
 	paginationDataSent: {}, //pagination data sent to the server
 	paginationDataReceived: {}, //pagination data received from the server
 	paginationAddRow: "page", //add rows on table or page
+
+	dataSource: false,
 
 	ajaxURL: false, //url for ajax loading
 	ajaxURLGenerator: false,
@@ -7061,6 +7275,8 @@ Tabulator.prototype._create = function () {
 	this.columnManager.setRowManager(this.rowManager);
 	this.rowManager.setColumnManager(this.columnManager);
 
+	this.dataManager = new DataManager(this);
+
 	if (this.options.virtualDomHoz) {
 		this.vdomHoz = new VDomHoz(this);
 	}
@@ -7081,7 +7297,7 @@ Tabulator.prototype._clearObjectPointers = function () {
 
 //build tabulator element
 Tabulator.prototype._buildElement = function () {
-	var _this24 = this;
+	var _this31 = this;
 
 	var element = this.element,
 	    mod = this.modules,
@@ -7219,7 +7435,7 @@ Tabulator.prototype._buildElement = function () {
 	if (options.initialHeaderFilter && this.modExists("filter", true)) {
 		options.initialHeaderFilter.forEach(function (item) {
 
-			var column = _this24.columnManager.findColumn(item.field);
+			var column = _this31.columnManager.findColumn(item.field);
 
 			if (column) {
 				mod.filter.setHeaderFilterValue(column, item.value);
@@ -7228,10 +7444,6 @@ Tabulator.prototype._buildElement = function () {
 				return false;
 			}
 		});
-	}
-
-	if (this.modExists("ajax")) {
-		mod.ajax.initialize();
 	}
 
 	if (options.pagination && this.modExists("page", true)) {
@@ -7266,49 +7478,7 @@ Tabulator.prototype._buildElement = function () {
 };
 
 Tabulator.prototype._loadInitialData = function () {
-	var self = this;
-
-	if (self.options.pagination && self.modExists("page")) {
-		self.modules.page.reset(true, true);
-
-		if (self.options.pagination == "local") {
-			if (self.options.data.length) {
-				self.rowManager.setData(self.options.data, false, true);
-			} else {
-				if ((self.options.ajaxURL || self.options.ajaxURLGenerator) && self.modExists("ajax")) {
-					self.modules.ajax.loadData(false, true).then(function () {}).catch(function () {
-						if (self.options.paginationInitialPage) {
-							self.modules.page.setPage(self.options.paginationInitialPage);
-						}
-					});
-
-					return;
-				} else {
-					self.rowManager.setData(self.options.data, false, true);
-				}
-			}
-
-			if (self.options.paginationInitialPage) {
-				self.modules.page.setPage(self.options.paginationInitialPage);
-			}
-		} else {
-			if (self.options.ajaxURL) {
-				self.modules.page.setPage(self.options.paginationInitialPage).then(function () {}).catch(function () {});
-			} else {
-				self.rowManager.setData([], false, true);
-			}
-		}
-	} else {
-		if (self.options.data.length) {
-			self.rowManager.setData(self.options.data);
-		} else {
-			if ((self.options.ajaxURL || self.options.ajaxURLGenerator) && self.modExists("ajax")) {
-				self.modules.ajax.loadData(false, true).then(function () {}).catch(function () {});
-			} else {
-				self.rowManager.setData(self.options.data, false, true);
-			}
-		}
-	}
+	this.dataManager.initialize();
 };
 
 //deconstructor
@@ -7329,6 +7499,8 @@ Tabulator.prototype.destroy = function () {
 	this.rowManager.rows = [];
 	this.rowManager.activeRows = [];
 	this.rowManager.displayRows = [];
+
+	this.dataManager.destroy();
 
 	//clear event bindings
 	if (this.options.autoResize && this.modExists("resizeTable")) {
@@ -7379,7 +7551,7 @@ Tabulator.prototype.restoreRedraw = function () {
 
 //local data from local file
 Tabulator.prototype.setDataFromLocalFile = function (extensions) {
-	var _this25 = this;
+	var _this32 = this;
 
 	return new Promise(function (resolve, reject) {
 		var input = document.createElement("input");
@@ -7403,7 +7575,7 @@ Tabulator.prototype.setDataFromLocalFile = function (extensions) {
 					return;
 				}
 
-				_this25.setData(data).then(function (data) {
+				_this32.setData(data).then(function (data) {
 					resolve(data);
 				}).catch(function (err) {
 					resolve(err);
@@ -7421,71 +7593,21 @@ Tabulator.prototype.setDataFromLocalFile = function (extensions) {
 };
 
 //load data
-Tabulator.prototype.setData = function (data, params, config) {
-	if (this.modExists("ajax")) {
-		this.modules.ajax.blockActiveRequest();
-	}
+Tabulator.prototype.setData = function (data) {
+	this.dataManager.abort();
 
-	return this._setData(data, params, config, false, true);
+	return this._setData(data, false, true);
 };
 
-Tabulator.prototype._setData = function (data, params, config, inPosition, columnsChanged) {
+Tabulator.prototype._setData = function (data, inPosition, columnsChanged) {
 	var self = this;
 
-	if (typeof data === "string") {
-		if (data.indexOf("{") == 0 || data.indexOf("[") == 0) {
-			//data is a json encoded string
-			return self.rowManager.setData(JSON.parse(data), inPosition, columnsChanged);
-		} else {
-
-			if (self.modExists("ajax", true)) {
-				if (params) {
-					self.modules.ajax.setParams(params);
-				}
-
-				if (config) {
-					self.modules.ajax.setConfig(config);
-				}
-
-				self.modules.ajax.setUrl(data);
-
-				if (self.options.pagination == "remote" && self.modExists("page", true)) {
-					self.modules.page.reset(true, true);
-					return self.modules.page.setPage(1);
-				} else {
-					//assume data is url, make ajax call to url to get data
-					return self.modules.ajax.loadData(inPosition, columnsChanged);
-				}
-			}
-		}
-	} else {
-		if (data) {
-			//asume data is already an object
-			return self.rowManager.setData(data, inPosition, columnsChanged);
-		} else {
-
-			//no data provided, check if ajaxURL is present;
-			if (self.modExists("ajax") && (self.modules.ajax.getUrl || self.options.ajaxURLGenerator)) {
-
-				if (self.options.pagination == "remote" && self.modExists("page", true)) {
-					self.modules.page.reset(true, true);
-					return self.modules.page.setPage(1);
-				} else {
-					return self.modules.ajax.loadData(inPosition, columnsChanged);
-				}
-			} else {
-				//empty data
-				return self.rowManager.setData([], inPosition, columnsChanged);
-			}
-		}
-	}
+	self.dataManager.getResults(inPosition, columnsChanged);
 };
 
 //clear data
 Tabulator.prototype.clearData = function () {
-	if (this.modExists("ajax")) {
-		this.modules.ajax.blockActiveRequest();
-	}
+	this.dataManager.abort();
 
 	this.rowManager.clearData();
 };
@@ -7548,25 +7670,21 @@ Tabulator.prototype.getAjaxUrl = function () {
 };
 
 //replace data, keeping table in position with same sort
-Tabulator.prototype.replaceData = function (data, params, config) {
-	if (this.modExists("ajax")) {
-		this.modules.ajax.blockActiveRequest();
-	}
+Tabulator.prototype.replaceData = function (data) {
+	this.dataManager.abort();
 
-	return this._setData(data, params, config, true);
+	return this._setData(data, true);
 };
 
 //update table data
 Tabulator.prototype.updateData = function (data) {
-	var _this26 = this;
+	var _this33 = this;
 
 	var self = this;
 	var responses = 0;
 
 	return new Promise(function (resolve, reject) {
-		if (_this26.modExists("ajax")) {
-			_this26.modules.ajax.blockActiveRequest();
-		}
+		_this33.dataManager.abort();
 
 		if (typeof data === "string") {
 			data = JSON.parse(data);
@@ -7596,19 +7714,17 @@ Tabulator.prototype.updateData = function (data) {
 };
 
 Tabulator.prototype.addData = function (data, pos, index) {
-	var _this27 = this;
+	var _this34 = this;
 
 	return new Promise(function (resolve, reject) {
-		if (_this27.modExists("ajax")) {
-			_this27.modules.ajax.blockActiveRequest();
-		}
+		_this34.dataManager.abort();
 
 		if (typeof data === "string") {
 			data = JSON.parse(data);
 		}
 
 		if (data) {
-			_this27.rowManager.addRows(data, pos, index).then(function (rows) {
+			_this34.rowManager.addRows(data, pos, index).then(function (rows) {
 				var output = [];
 
 				rows.forEach(function (row) {
@@ -7626,16 +7742,14 @@ Tabulator.prototype.addData = function (data, pos, index) {
 
 //update table data
 Tabulator.prototype.updateOrAddData = function (data) {
-	var _this28 = this;
+	var _this35 = this;
 
 	var self = this,
 	    rows = [],
 	    responses = 0;
 
 	return new Promise(function (resolve, reject) {
-		if (_this28.modExists("ajax")) {
-			_this28.modules.ajax.blockActiveRequest();
-		}
+		_this35.dataManager.abort();
 
 		if (typeof data === "string") {
 			data = JSON.parse(data);
@@ -7700,10 +7814,10 @@ Tabulator.prototype.getRowFromPosition = function (position, active) {
 
 //delete row from table
 Tabulator.prototype.deleteRow = function (index) {
-	var _this29 = this;
+	var _this36 = this;
 
 	return new Promise(function (resolve, reject) {
-		var self = _this29,
+		var self = _this36,
 		    count = 0,
 		    successCount = 0,
 		    foundRows = [];
@@ -7725,7 +7839,7 @@ Tabulator.prototype.deleteRow = function (index) {
 
 		//find matching rows
 		index.forEach(function (item) {
-			var row = _this29.rowManager.findRow(item, true);
+			var row = _this36.rowManager.findRow(item, true);
 
 			if (row) {
 				foundRows.push(row);
@@ -7738,7 +7852,7 @@ Tabulator.prototype.deleteRow = function (index) {
 
 		//sort rows into correct order to ensure smooth delete from table
 		foundRows.sort(function (a, b) {
-			return _this29.rowManager.rows.indexOf(a) > _this29.rowManager.rows.indexOf(b) ? 1 : -1;
+			return _this36.rowManager.rows.indexOf(a) > _this36.rowManager.rows.indexOf(b) ? 1 : -1;
 		});
 
 		foundRows.forEach(function (row) {
@@ -7755,17 +7869,17 @@ Tabulator.prototype.deleteRow = function (index) {
 
 //add row to table
 Tabulator.prototype.addRow = function (data, pos, index) {
-	var _this30 = this;
+	var _this37 = this;
 
 	return new Promise(function (resolve, reject) {
 		if (typeof data === "string") {
 			data = JSON.parse(data);
 		}
 
-		_this30.rowManager.addRows(data, pos, index).then(function (rows) {
+		_this37.rowManager.addRows(data, pos, index).then(function (rows) {
 			//recalc column calculations if present
-			if (_this30.modExists("columnCalcs")) {
-				_this30.modules.columnCalcs.recalc(_this30.rowManager.activeRows);
+			if (_this37.modExists("columnCalcs")) {
+				_this37.modules.columnCalcs.recalc(_this37.rowManager.activeRows);
 			}
 
 			resolve(rows[0].getComponent());
@@ -7775,10 +7889,10 @@ Tabulator.prototype.addRow = function (data, pos, index) {
 
 //update a row if it exitsts otherwise create it
 Tabulator.prototype.updateOrAddRow = function (index, data) {
-	var _this31 = this;
+	var _this38 = this;
 
 	return new Promise(function (resolve, reject) {
-		var row = _this31.rowManager.findRow(index);
+		var row = _this38.rowManager.findRow(index);
 
 		if (typeof data === "string") {
 			data = JSON.parse(data);
@@ -7787,8 +7901,8 @@ Tabulator.prototype.updateOrAddRow = function (index, data) {
 		if (row) {
 			row.updateData(data).then(function () {
 				//recalc column calculations if present
-				if (_this31.modExists("columnCalcs")) {
-					_this31.modules.columnCalcs.recalc(_this31.rowManager.activeRows);
+				if (_this38.modExists("columnCalcs")) {
+					_this38.modules.columnCalcs.recalc(_this38.rowManager.activeRows);
 				}
 
 				resolve(row.getComponent());
@@ -7796,10 +7910,10 @@ Tabulator.prototype.updateOrAddRow = function (index, data) {
 				reject(err);
 			});
 		} else {
-			row = _this31.rowManager.addRows(data).then(function (rows) {
+			row = _this38.rowManager.addRows(data).then(function (rows) {
 				//recalc column calculations if present
-				if (_this31.modExists("columnCalcs")) {
-					_this31.modules.columnCalcs.recalc(_this31.rowManager.activeRows);
+				if (_this38.modExists("columnCalcs")) {
+					_this38.modules.columnCalcs.recalc(_this38.rowManager.activeRows);
 				}
 
 				resolve(rows[0].getComponent());
@@ -7812,10 +7926,10 @@ Tabulator.prototype.updateOrAddRow = function (index, data) {
 
 //update row data
 Tabulator.prototype.updateRow = function (index, data) {
-	var _this32 = this;
+	var _this39 = this;
 
 	return new Promise(function (resolve, reject) {
-		var row = _this32.rowManager.findRow(index);
+		var row = _this39.rowManager.findRow(index);
 
 		if (typeof data === "string") {
 			data = JSON.parse(data);
@@ -7836,13 +7950,13 @@ Tabulator.prototype.updateRow = function (index, data) {
 
 //scroll to row in DOM
 Tabulator.prototype.scrollToRow = function (index, position, ifVisible) {
-	var _this33 = this;
+	var _this40 = this;
 
 	return new Promise(function (resolve, reject) {
-		var row = _this33.rowManager.findRow(index);
+		var row = _this40.rowManager.findRow(index);
 
 		if (row) {
-			_this33.rowManager.scrollToRow(row, position, ifVisible).then(function () {
+			_this40.rowManager.scrollToRow(row, position, ifVisible).then(function () {
 				resolve();
 			}).catch(function (err) {
 				reject(err);
@@ -7978,12 +8092,12 @@ Tabulator.prototype.toggleColumn = function (field) {
 };
 
 Tabulator.prototype.addColumn = function (definition, before, field) {
-	var _this34 = this;
+	var _this41 = this;
 
 	return new Promise(function (resolve, reject) {
-		var column = _this34.columnManager.findColumn(field);
+		var column = _this41.columnManager.findColumn(field);
 
-		_this34.columnManager.addColumn(definition, before, column).then(function (column) {
+		_this41.columnManager.addColumn(definition, before, column).then(function (column) {
 			resolve(column.getComponent());
 		}).catch(function (err) {
 			reject(err);
@@ -7992,10 +8106,10 @@ Tabulator.prototype.addColumn = function (definition, before, field) {
 };
 
 Tabulator.prototype.deleteColumn = function (field) {
-	var _this35 = this;
+	var _this42 = this;
 
 	return new Promise(function (resolve, reject) {
-		var column = _this35.columnManager.findColumn(field);
+		var column = _this42.columnManager.findColumn(field);
 
 		if (column) {
 			column.delete().then(function () {
@@ -8011,10 +8125,10 @@ Tabulator.prototype.deleteColumn = function (field) {
 };
 
 Tabulator.prototype.updateColumnDefinition = function (field, definition) {
-	var _this36 = this;
+	var _this43 = this;
 
 	return new Promise(function (resolve, reject) {
-		var column = _this36.columnManager.findColumn(field);
+		var column = _this43.columnManager.findColumn(field);
 
 		if (column) {
 			column.updateDefinition(definition).then(function (col) {
@@ -8046,13 +8160,13 @@ Tabulator.prototype.moveColumn = function (from, to, after) {
 
 //scroll to column in DOM
 Tabulator.prototype.scrollToColumn = function (field, position, ifVisible) {
-	var _this37 = this;
+	var _this44 = this;
 
 	return new Promise(function (resolve, reject) {
-		var column = _this37.columnManager.findColumn(field);
+		var column = _this44.columnManager.findColumn(field);
 
 		if (column) {
-			_this37.columnManager.scrollToColumn(column, position, ifVisible).then(function () {
+			_this44.columnManager.scrollToColumn(column, position, ifVisible).then(function () {
 				resolve();
 			}).catch(function (err) {
 				reject(err);
@@ -8263,7 +8377,7 @@ Tabulator.prototype.getInvalidCells = function () {
 };
 
 Tabulator.prototype.clearCellValidation = function (cells) {
-	var _this38 = this;
+	var _this45 = this;
 
 	if (this.modExists("validate", true)) {
 
@@ -8276,7 +8390,7 @@ Tabulator.prototype.clearCellValidation = function (cells) {
 		}
 
 		cells.forEach(function (cell) {
-			_this38.modules.validate.clearValidation(cell._getSelf());
+			_this45.modules.validate.clearValidation(cell._getSelf());
 		});
 	}
 };
@@ -8317,14 +8431,14 @@ Tabulator.prototype.setPage = function (page) {
 };
 
 Tabulator.prototype.setPageToRow = function (row) {
-	var _this39 = this;
+	var _this46 = this;
 
 	return new Promise(function (resolve, reject) {
-		if (_this39.options.pagination && _this39.modExists("page")) {
-			row = _this39.rowManager.findRow(row);
+		if (_this46.options.pagination && _this46.modExists("page")) {
+			row = _this46.rowManager.findRow(row);
 
 			if (row) {
-				_this39.modules.page.setPageToRow(row).then(function () {
+				_this46.modules.page.setPageToRow(row).then(function () {
 					resolve();
 				}).catch(function () {
 					reject();
@@ -8473,7 +8587,7 @@ Tabulator.prototype.getEditedCells = function () {
 };
 
 Tabulator.prototype.clearCellEdited = function (cells) {
-	var _this40 = this;
+	var _this47 = this;
 
 	if (this.modExists("edit", true)) {
 
@@ -8486,7 +8600,7 @@ Tabulator.prototype.clearCellEdited = function (cells) {
 		}
 
 		cells.forEach(function (cell) {
-			_this40.modules.edit.clearEdited(cell._getSelf());
+			_this47.modules.edit.clearEdited(cell._getSelf());
 		});
 	}
 };
@@ -8874,7 +8988,7 @@ Layout.prototype.modes = {
 
 	//resize columns to fit data the contain and stretch last column to fill table
 	"fitDataStretch": function fitDataStretch(columns) {
-		var _this41 = this;
+		var _this48 = this;
 
 		var colsWidth = 0,
 		    tableWidth = this.table.rowManager.element.clientWidth,
@@ -8886,7 +9000,7 @@ Layout.prototype.modes = {
 				column.reinitializeWidth();
 			}
 
-			if (_this41.table.options.responsiveLayout ? column.modules.responsive.visible : column.visible) {
+			if (_this48.table.options.responsiveLayout ? column.modules.responsive.visible : column.visible) {
 				lastCol = column;
 			}
 
