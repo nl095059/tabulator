@@ -6705,6 +6705,7 @@ DataManager.prototype.getStatus = function (token) {
 DataManager.prototype.getResults = function () {
 	var _this30 = this;
 
+	this.table.overlay.showLoader();
 	return new Promise(function (resolve) {
 		var viewParams = _this30.getViewParams();
 		_this30.dataSource.getResults(viewParams).then(function (data) {
@@ -6712,11 +6713,15 @@ DataManager.prototype.getResults = function () {
 			_this30.table.rowManager.setData(data);
 			_this30.table.rowManager.scrollHorizontal(left);
 			_this30.table.columnManager.scrollHorizontal(left);
+			_this30.table.overlay.hideLoader();
 
 			if (_this30.table.options.pageLoaded) {
 				_this30.table.options.pageLoaded.call(_this30.table, viewParams.page.page);
 			}
 			resolve();
+		}).catch(function (err) {
+			_this30.table.options.dataSource.onError.call(_this30, err);
+			_this30.table.overlay.showError();
 		});
 	});
 };
@@ -6738,6 +6743,106 @@ DataManager.prototype.destroy = function () {
 // 		ObjectData
 // 	};
 // }
+var TableOverlay = function TableOverlay(table) {
+	this.table = table; //hold Tabulator object
+	this.loaderElement = this.createLoaderElement(); //loader message div
+
+	this.msgElement = this.createMsgElement(); //message element
+
+	this.loadingElement = false;
+	this.errorElement = false;
+};
+
+TableOverlay.prototype.initialize = function () {
+	var template;
+
+	this.loaderElement.appendChild(this.msgElement);
+
+	if (this.table.options.ajaxLoaderLoading) {
+		if (typeof this.table.options.ajaxLoaderLoading == "string") {
+			template = document.createElement('template');
+			template.innerHTML = this.table.options.ajaxLoaderLoading.trim();
+			this.loadingElement = template.content.firstChild;
+		} else {
+			this.loadingElement = this.table.options.ajaxLoaderLoading;
+		}
+	}
+
+	if (this.table.options.ajaxLoaderError) {
+		if (typeof this.table.options.ajaxLoaderError == "string") {
+			template = document.createElement('template');
+			template.innerHTML = this.table.options.ajaxLoaderError.trim();
+			this.errorElement = template.content.firstChild;
+		} else {
+			this.errorElement = this.table.options.ajaxLoaderError;
+		}
+	}
+};
+
+TableOverlay.prototype.createLoaderElement = function () {
+	var el = document.createElement("div");
+	el.classList.add("tabulator-loader");
+	return el;
+};
+
+TableOverlay.prototype.createMsgElement = function () {
+	var el = document.createElement("div");
+
+	el.classList.add("tabulator-loader-msg");
+	el.setAttribute("role", "alert");
+
+	return el;
+};
+
+TableOverlay.prototype.showLoader = function () {
+	var shouldLoad = typeof this.table.options.ajaxLoader === "function" ? this.table.options.ajaxLoader() : this.table.options.ajaxLoader;
+
+	if (shouldLoad) {
+
+		this.hideLoader();
+
+		while (this.msgElement.firstChild) {
+			this.msgElement.removeChild(this.msgElement.firstChild);
+		}this.msgElement.classList.remove("tabulator-error");
+		this.msgElement.classList.add("tabulator-loading");
+
+		if (this.loadingElement) {
+			this.msgElement.appendChild(this.loadingElement);
+		} else {
+			this.msgElement.innerHTML = this.table.modules.localize.getText("ajax|loading");
+		}
+
+		this.table.element.appendChild(this.loaderElement);
+	}
+};
+
+TableOverlay.prototype.showError = function () {
+	this.hideLoader();
+
+	while (this.msgElement.firstChild) {
+		this.msgElement.removeChild(this.msgElement.firstChild);
+	}this.msgElement.classList.remove("tabulator-loading");
+	this.msgElement.classList.add("tabulator-error");
+
+	if (this.errorElement) {
+		this.msgElement.appendChild(this.errorElement);
+	} else {
+		this.msgElement.innerHTML = this.table.modules.localize.getText("ajax|error");
+	}
+
+	this.table.element.appendChild(this.loaderElement);
+
+	var self = this;
+	setTimeout(function () {
+		self.hideLoader();
+	}, 3000);
+};
+
+TableOverlay.prototype.hideLoader = function () {
+	if (this.loaderElement.parentNode) {
+		this.loaderElement.parentNode.removeChild(this.loaderElement);
+	}
+};
 
 var Tabulator = function Tabulator(element, options) {
 
@@ -7277,6 +7382,8 @@ Tabulator.prototype._create = function () {
 
 	this.dataManager = new DataManager(this);
 
+	this.overlay = new TableOverlay(this);
+
 	if (this.options.virtualDomHoz) {
 		this.vdomHoz = new VDomHoz(this);
 	}
@@ -7473,6 +7580,8 @@ Tabulator.prototype._buildElement = function () {
 	if (options.printAsHtml && this.modExists("print")) {
 		mod.print.initialize();
 	}
+
+	this.overlay.initialize(this);
 
 	options.tableBuilt.call(this);
 };

@@ -160,6 +160,7 @@ DataManager.prototype.getStatus = function (token) {
 };
 
 DataManager.prototype.getResults = function() {
+	this.table.overlay.showLoader();
 	return new Promise((resolve) => {
 		var viewParams = this.getViewParams();
 		this.dataSource.getResults(viewParams)
@@ -168,11 +169,18 @@ DataManager.prototype.getResults = function() {
 				this.table.rowManager.setData(data);
 				this.table.rowManager.scrollHorizontal(left);
 				this.table.columnManager.scrollHorizontal(left);
+				this.table.overlay.hideLoader();
 
 				if (this.table.options.pageLoaded) {
 					this.table.options.pageLoaded.call(this.table, viewParams.page.page);
 				}
 				resolve();
+			})
+			.catch((err) => {
+				if (this.table.options.dataSource.onError) {
+					this.table.options.dataSource.onError.call(this, err);
+				}
+				this.table.overlay.showError();
 			});
 	});
 };

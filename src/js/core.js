@@ -10,6 +10,7 @@
 /*=include cell.js */
 /*=include footer_manager.js */
 /*=include data_manager.js */
+/*=include overlay.js */
 
 var Tabulator = function(element, options){
 
@@ -546,6 +547,8 @@ Tabulator.prototype._create = function(){
 
 	this.dataManager = new DataManager(this);
 
+	this.overlay = new Overlay(this);
+
 	if(this.options.virtualDomHoz){
 		this.vdomHoz = new VDomHoz(this);
 	}
@@ -743,6 +746,8 @@ Tabulator.prototype._buildElement = function(){
 	if(options.printAsHtml && this.modExists("print")){
 		mod.print.initialize();
 	}
+
+	this.overlay.initialize(this);
 
 	options.tableBuilt.call(this);
 };
