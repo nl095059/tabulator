@@ -31,6 +31,12 @@ var MockTabulator = function MockTabulator(element, options) {
 
     this.dataManager = new DataManager(this);
 
+    this.overlay = {
+        showLoader: jest.fn(),
+        hideLoader: jest.fn(),
+        showError: jest.fn()
+    };
+
     this.bindModules();
 };
 
@@ -94,6 +100,7 @@ describe('Datamanager', () => {
             let getStatus = jest.fn();
             let getResults = jest.fn();
             let getStatusHTML = jest.fn();
+            let onError = jest.fn();
 
             function createTable(options) {
                 var tabulator = new Tabulator({}, Object.assign({
@@ -105,6 +112,7 @@ describe('Datamanager', () => {
                             getResults,
                             statusPollInterval: 0
                         },
+                        onError,
                         getStatusHTML,
                         sorting: true,
                     },
@@ -141,7 +149,9 @@ describe('Datamanager', () => {
                     tabulator.dataManager.initialize().then(() => {
                         expect(initializeQuery).toHaveBeenCalled();
 
+                        expect(tabulator.overlay.showLoader).toHaveBeenCalled();
                         expect(getResults).toHaveBeenCalledWith({ page: { max: 1, mode: 'remote', page: 1, pageSize: 5 } });
+                        expect(tabulator.overlay.hideLoader).toHaveBeenCalled();
                         expect(tabulator.rowManager.setData).toHaveBeenCalledWith([{ test: 'result' }, { test: 'result2' }]);
                         done();
                     });
@@ -232,7 +242,10 @@ describe('Datamanager', () => {
                     setupMocks({ state: "Finished", count: 50});
 
                     tabulator.dataManager.initialize().then(() => {
+                        expect(tabulator.overlay.showLoader).toHaveBeenCalled();
                         expect(getResults).toHaveBeenCalledWith({"page": {"max": 1, "mode": "remote", "page": 1, "pageSize": 5}});
+                        expect(tabulator.overlay.hideLoader).toHaveBeenCalled();
+                        expect(tabulator.overlay.showError).not.toHaveBeenCalled();
                         expect(getStatus).toHaveBeenCalled();
 
                         expect(tabulator.rowManager.setData).toHaveBeenCalledTimes(1);

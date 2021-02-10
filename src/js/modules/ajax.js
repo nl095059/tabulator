@@ -6,10 +6,6 @@ var Ajax = function(table){
 	this.urlGenerator = false;
 	this.params = false; //request parameters
 
-	this.loaderElement = this.createLoaderElement(); //loader message div
-	this.msgElement = this.createMsgElement(); //message element
-	this.loadingElement = false;
-	this.errorElement = false;
 	this.loaderPromise = false;
 
 	this.progressiveLoad = false;
@@ -20,33 +16,9 @@ var Ajax = function(table){
 
 //initialize setup options
 Ajax.prototype.initialize = function(){
-	var template;
-
-	this.loaderElement.appendChild(this.msgElement);
-
-	if(this.table.options.ajaxLoaderLoading){
-		if(typeof this.table.options.ajaxLoaderLoading == "string"){
-			template = document.createElement('template');
-			template.innerHTML = this.table.options.ajaxLoaderLoading.trim();
-			this.loadingElement = template.content.firstChild;
-		}else{
-			this.loadingElement = this.table.options.ajaxLoaderLoading;
-		}
-	}
-
 	this.loaderPromise = this.table.options.ajaxRequestFunc || this.defaultLoaderPromise;
 
 	this.urlGenerator = this.table.options.ajaxURLGenerator || this.defaultURLGenerator;
-
-	if(this.table.options.ajaxLoaderError){
-		if(typeof this.table.options.ajaxLoaderError == "string"){
-			template = document.createElement('template');
-			template.innerHTML = this.table.options.ajaxLoaderError.trim();
-			this.errorElement = template.content.firstChild;
-		}else{
-			this.errorElement = this.table.options.ajaxLoaderError;
-		}
-	}
 
 	if(this.table.options.ajaxParams){
 		this.setParams(this.table.options.ajaxParams);
@@ -124,21 +96,6 @@ Ajax.prototype.getData = function(url) {
 
 Ajax.prototype.getResults = function(inPosition, columnsChanged){
 	return this._loadDataStandard(inPosition, columnsChanged);
-};
-
-Ajax.prototype.createLoaderElement = function (){
-	var el = document.createElement("div");
-	el.classList.add("tabulator-loader");
-	return el;
-};
-
-Ajax.prototype.createMsgElement = function (){
-	var el = document.createElement("div");
-
-	el.classList.add("tabulator-loader-msg");
-	el.setAttribute("role", "alert");
-
-	return el;
 };
 
 //set ajax params
@@ -333,51 +290,6 @@ Ajax.prototype.sendRequest = function(silent){
 			reject();
 		}
 	});
-
-
-};
-
-Ajax.prototype.showLoader = function(){
-	var shouldLoad = typeof this.table.options.ajaxLoader === "function" ? this.table.options.ajaxLoader() : this.table.options.ajaxLoader;
-
-	if(shouldLoad){
-
-		this.hideLoader();
-
-		while(this.msgElement.firstChild) this.msgElement.removeChild(this.msgElement.firstChild);
-		this.msgElement.classList.remove("tabulator-error");
-		this.msgElement.classList.add("tabulator-loading");
-
-		if(this.loadingElement){
-			this.msgElement.appendChild(this.loadingElement);
-		}else{
-			this.msgElement.innerHTML = this.table.modules.localize.getText("ajax|loading");
-		}
-
-		this.table.element.appendChild(this.loaderElement);
-	}
-};
-
-Ajax.prototype.showError = function(){
-	this.hideLoader();
-
-	while(this.msgElement.firstChild) this.msgElement.removeChild(this.msgElement.firstChild);
-	this.msgElement.classList.remove("tabulator-loading");
-	this.msgElement.classList.add("tabulator-error");
-
-	if(this.errorElement){
-		this.msgElement.appendChild(this.errorElement);
-	}else{
-		this.msgElement.innerHTML = this.table.modules.localize.getText("ajax|error");
-	}
-
-	this.table.element.appendChild(this.loaderElement);
-};
-
-Ajax.prototype.hideLoader = function(){
-	if(this.loaderElement.parentNode){
-		this.loaderElement.parentNode.removeChild(this.loaderElement);
-	}
 };
 
 //default ajax config object
@@ -516,5 +428,14 @@ Ajax.prototype.contentTypeFormatters = {
 		},
 	},
 }
+
+Ajax.prototype.showLoader = function() {
+	this.table.overlay.showLoader();
+}
+
+Ajax.prototype.hideLoader = function() {
+	this.table.overlay.hideLoader();
+}
+
 
 Tabulator.prototype.registerModule("ajax", Ajax);
