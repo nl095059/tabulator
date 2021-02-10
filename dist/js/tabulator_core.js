@@ -6720,7 +6720,9 @@ DataManager.prototype.getResults = function () {
 			}
 			resolve();
 		}).catch(function (err) {
-			_this30.table.options.dataSource.onError.call(_this30, err);
+			if (_this30.table.options.dataSource.onError) {
+				_this30.table.options.dataSource.onError.call(_this30, err);
+			}
 			_this30.table.overlay.showError();
 		});
 	});
@@ -6743,7 +6745,7 @@ DataManager.prototype.destroy = function () {
 // 		ObjectData
 // 	};
 // }
-var TableOverlay = function TableOverlay(table) {
+var Overlay = function Overlay(table) {
 	this.table = table; //hold Tabulator object
 	this.loaderElement = this.createLoaderElement(); //loader message div
 
@@ -6753,7 +6755,7 @@ var TableOverlay = function TableOverlay(table) {
 	this.errorElement = false;
 };
 
-TableOverlay.prototype.initialize = function () {
+Overlay.prototype.initialize = function () {
 	var template;
 
 	this.loaderElement.appendChild(this.msgElement);
@@ -6779,13 +6781,13 @@ TableOverlay.prototype.initialize = function () {
 	}
 };
 
-TableOverlay.prototype.createLoaderElement = function () {
+Overlay.prototype.createLoaderElement = function () {
 	var el = document.createElement("div");
 	el.classList.add("tabulator-loader");
 	return el;
 };
 
-TableOverlay.prototype.createMsgElement = function () {
+Overlay.prototype.createMsgElement = function () {
 	var el = document.createElement("div");
 
 	el.classList.add("tabulator-loader-msg");
@@ -6794,7 +6796,7 @@ TableOverlay.prototype.createMsgElement = function () {
 	return el;
 };
 
-TableOverlay.prototype.showLoader = function () {
+Overlay.prototype.showLoader = function () {
 	var shouldLoad = typeof this.table.options.ajaxLoader === "function" ? this.table.options.ajaxLoader() : this.table.options.ajaxLoader;
 
 	if (shouldLoad) {
@@ -6816,7 +6818,7 @@ TableOverlay.prototype.showLoader = function () {
 	}
 };
 
-TableOverlay.prototype.showError = function () {
+Overlay.prototype.showError = function () {
 	this.hideLoader();
 
 	while (this.msgElement.firstChild) {
@@ -6838,7 +6840,7 @@ TableOverlay.prototype.showError = function () {
 	}, 3000);
 };
 
-TableOverlay.prototype.hideLoader = function () {
+Overlay.prototype.hideLoader = function () {
 	if (this.loaderElement.parentNode) {
 		this.loaderElement.parentNode.removeChild(this.loaderElement);
 	}
@@ -7382,7 +7384,7 @@ Tabulator.prototype._create = function () {
 
 	this.dataManager = new DataManager(this);
 
-	this.overlay = new TableOverlay(this);
+	this.overlay = new Overlay(this);
 
 	if (this.options.virtualDomHoz) {
 		this.vdomHoz = new VDomHoz(this);
