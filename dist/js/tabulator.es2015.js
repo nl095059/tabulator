@@ -6544,11 +6544,11 @@ ObjectData.prototype.initializeQuery = function (viewParams) {
 	});
 };
 
-ObjectData.prototype.getStatus = function () {
+ObjectData.prototype.getStatus = function (viewParams) {
 	var _this25 = this;
 
 	return new Promise(function (resolve) {
-		resolve(_this25.datasourceOptions.async.getStatus.call(_this25));
+		resolve(_this25.datasourceOptions.async.getStatus.call(_this25, viewParams));
 	});
 };
 
@@ -6582,9 +6582,9 @@ var DataManager = function DataManager(table) {
 };
 
 DataManager.prototype.responseCodes = {
-	IN_PROGRESS: 'In Progress',
-	COMPLETE: 'Finished',
-	ERRORED: 'Error'
+	IN_PROGRESS: 'generating',
+	COMPLETE: 'complete',
+	ERRORED: 'failed'
 };
 
 DataManager.prototype.initialize = function () {
@@ -6684,7 +6684,7 @@ function validateStatusResponse(status) {
 DataManager.prototype.getStatus = function (token) {
 	var _this29 = this;
 
-	this.dataSource.getStatus(token).then(function (status) {
+	this.dataSource.getStatus(token, this.getViewParams()).then(function (status) {
 
 		validateStatusResponse(status);
 

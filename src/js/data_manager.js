@@ -13,9 +13,9 @@ ObjectData.prototype.initializeQuery = function(viewParams) {
 	});
 }
 
-ObjectData.prototype.getStatus = function() {
+ObjectData.prototype.getStatus = function(viewParams) {
 	return new Promise((resolve) => {
-		resolve(this.datasourceOptions.async.getStatus.call(this));
+		resolve(this.datasourceOptions.async.getStatus.call(this, viewParams));
 	});
 };
 
@@ -47,9 +47,9 @@ const DataManager = function(table){
 }
 
 DataManager.prototype.responseCodes = {
-	IN_PROGRESS: 'In Progress',
-	COMPLETE: 'Finished',
-	ERRORED: 'Error'
+	IN_PROGRESS: 'generating',
+	COMPLETE: 'complete',
+	ERRORED: 'failed'
 };
 
 DataManager.prototype.initialize = function() {
@@ -140,7 +140,7 @@ function validateStatusResponse(status) {
 };
 
 DataManager.prototype.getStatus = function (token) {
-	this.dataSource.getStatus(token).then((status) => {
+	this.dataSource.getStatus(token, this.getViewParams()).then((status) => {
 
 		validateStatusResponse(status);
 
