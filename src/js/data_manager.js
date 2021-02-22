@@ -2,6 +2,8 @@ const ObjectData = function() {
 	this.datasourceOptions = undefined;
 };
 
+const noopFunc = function() {};
+
 ObjectData.prototype.initialize = function(datasourceOptions) {
 	this.validateParams(datasourceOptions);
 	this.datasourceOptions = datasourceOptions;
@@ -9,7 +11,8 @@ ObjectData.prototype.initialize = function(datasourceOptions) {
 
 ObjectData.prototype.initializeQuery = function(viewParams) {
 	return new Promise((resolve) => {
-		resolve(this.datasourceOptions.async.initializeQuery.call(this, viewParams));
+		const promiseFunction = this.datasourceOptions.async.initializeQuery || noopFunc;
+		resolve(promiseFunction.call(this, viewParams));
 	});
 }
 
@@ -29,9 +32,6 @@ ObjectData.prototype.validateParams = function(datasourceOptions) {
 	if (!datasourceOptions.async) {
 		throw new Error('Object datasource requires mandatory async property');
 	}
-	if (!datasourceOptions.async.initializeQuery) {
-		throw new Error('Object datasource has not been passed an initQuery callback');
-	}
 	if (!datasourceOptions.async.getStatus) {
 		throw new Error('Object datasource has not been passed a getStatus callback');
 	}
@@ -42,14 +42,13 @@ ObjectData.prototype.validateParams = function(datasourceOptions) {
 
 const DataManager = function(table){
 	this.table = table; //hold Tabulator object
-	this.token = undefined;
 	this.dataSource = undefined;
 }
 
 DataManager.prototype.responseCodes = {
-	IN_PROGRESS: 'generating',
-	COMPLETE: 'complete',
-	ERRORED: 'failed'
+	IN_PROGRESS: 'In Progress',
+	COMPLETE: 'Finished',
+	ERRORED: 'Error'
 };
 
 DataManager.prototype.initialize = function() {
@@ -65,12 +64,11 @@ DataManager.prototype.initialize = function() {
 
 		this.dataSource.initialize(dataSourceOptions);
 
-		return this.dataSource.initializeQuery(dataSourceOptions, this.getViewParams()).then((token) => {
-			this.token = token;
+		return this.dataSource.initializeQuery(dataSourceOptions, this.getViewParams()).then(() => {
 
 			if (dataSourceOptions.async) {
 				// If asynchronous, then start a poller
-				this.initializePoller(dataSourceOptions.async.statusPollInterval, token);
+				this.initializePoller(dataSourceOptions.async.statusPollInterval);
 			}
 
 			// If we have paging mod and we want paging initialise it here.
@@ -104,8 +102,8 @@ DataManager.prototype.getViewParams = function() {
 	return params;
 };
 
-DataManager.prototype.initializePoller = function(pollInterval, token) {
-	this.poller = setInterval(() => this.getStatus(token), pollInterval);
+DataManager.prototype.initializePoller = function(pollInterval) {
+	this.poller = setInterval(() => this.getStatus(), pollInterval);
 };
 
 DataManager.prototype.clearPoller = function() {
@@ -139,8 +137,8 @@ function validateStatusResponse(status) {
 	}
 };
 
-DataManager.prototype.getStatus = function (token) {
-	this.dataSource.getStatus(token, this.getViewParams()).then((status) => {
+DataManager.prototype.getStatus = function () {
+	this.dataSource.getStatus(this.getViewParams()).then((status) => {
 
 		validateStatusResponse(status);
 

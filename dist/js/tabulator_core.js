@@ -6531,6 +6531,8 @@ var ObjectData = function ObjectData() {
 	this.datasourceOptions = undefined;
 };
 
+var noopFunc = function noopFunc() {};
+
 ObjectData.prototype.initialize = function (datasourceOptions) {
 	this.validateParams(datasourceOptions);
 	this.datasourceOptions = datasourceOptions;
@@ -6540,7 +6542,8 @@ ObjectData.prototype.initializeQuery = function (viewParams) {
 	var _this24 = this;
 
 	return new Promise(function (resolve) {
-		resolve(_this24.datasourceOptions.async.initializeQuery.call(_this24, viewParams));
+		var promiseFunction = _this24.datasourceOptions.async.initializeQuery || noopFunc;
+		resolve(promiseFunction.call(_this24, viewParams));
 	});
 };
 
@@ -6564,9 +6567,9 @@ ObjectData.prototype.validateParams = function (datasourceOptions) {
 	if (!datasourceOptions.async) {
 		throw new Error('Object datasource requires mandatory async property');
 	}
-	if (!datasourceOptions.async.initializeQuery) {
-		throw new Error('Object datasource has not been passed an initQuery callback');
-	}
+	// if (!datasourceOptions.async.initializeQuery) {
+	// 	throw new Error('Object datasource has not been passed an initQuery callback');
+	// }
 	if (!datasourceOptions.async.getStatus) {
 		throw new Error('Object datasource has not been passed a getStatus callback');
 	}
@@ -6577,14 +6580,13 @@ ObjectData.prototype.validateParams = function (datasourceOptions) {
 
 var DataManager = function DataManager(table) {
 	this.table = table; //hold Tabulator object
-	this.token = undefined;
 	this.dataSource = undefined;
 };
 
 DataManager.prototype.responseCodes = {
-	IN_PROGRESS: 'generating',
-	COMPLETE: 'complete',
-	ERRORED: 'failed'
+	IN_PROGRESS: 'In Progress',
+	COMPLETE: 'Finished',
+	ERRORED: 'Error'
 };
 
 DataManager.prototype.initialize = function () {
@@ -6602,12 +6604,11 @@ DataManager.prototype.initialize = function () {
 
 		_this27.dataSource.initialize(dataSourceOptions);
 
-		return _this27.dataSource.initializeQuery(dataSourceOptions, _this27.getViewParams()).then(function (token) {
-			_this27.token = token;
+		return _this27.dataSource.initializeQuery(dataSourceOptions, _this27.getViewParams()).then(function () {
 
 			if (dataSourceOptions.async) {
 				// If asynchronous, then start a poller
-				_this27.initializePoller(dataSourceOptions.async.statusPollInterval, token);
+				_this27.initializePoller(dataSourceOptions.async.statusPollInterval);
 			}
 
 			// If we have paging mod and we want paging initialise it here.
@@ -6641,11 +6642,11 @@ DataManager.prototype.getViewParams = function () {
 	return params;
 };
 
-DataManager.prototype.initializePoller = function (pollInterval, token) {
+DataManager.prototype.initializePoller = function (pollInterval) {
 	var _this28 = this;
 
 	this.poller = setInterval(function () {
-		return _this28.getStatus(token);
+		return _this28.getStatus();
 	}, pollInterval);
 };
 
@@ -6681,10 +6682,10 @@ function validateStatusResponse(status) {
 	}
 };
 
-DataManager.prototype.getStatus = function (token) {
+DataManager.prototype.getStatus = function () {
 	var _this29 = this;
 
-	this.dataSource.getStatus(token, this.getViewParams()).then(function (status) {
+	this.dataSource.getStatus(this.getViewParams()).then(function (status) {
 
 		validateStatusResponse(status);
 
