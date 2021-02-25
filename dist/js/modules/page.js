@@ -307,6 +307,7 @@ Page.prototype.setPage = function (page) {
 	}
 
 	return new Promise(function (resolve, reject) {
+		var oldPage = _this2.page;
 
 		page = parseInt(page);
 
@@ -314,8 +315,9 @@ Page.prototype.setPage = function (page) {
 			_this2.page = page;
 			_this2.trigger().then(function () {
 				resolve();
-			}).catch(function () {
-				reject();
+			}).catch(function (err) {
+				_this2.page = oldPage;
+				reject(err);
 			});
 
 			if (self.table.options.persistence && self.table.modExists("persistence", true) && self.table.modules.persistence.config.page) {
@@ -442,8 +444,9 @@ Page.prototype.previousPage = function () {
 			_this4.page--;
 			_this4.trigger().then(function () {
 				resolve();
-			}).catch(function () {
-				reject();
+			}).catch(function (err) {
+				_this4.page++;
+				reject(err);
 			});
 
 			if (_this4.table.options.persistence && _this4.table.modExists("persistence", true) && _this4.table.modules.persistence.config.page) {
@@ -465,8 +468,9 @@ Page.prototype.nextPage = function () {
 			_this5.page++;
 			_this5.trigger().then(function () {
 				resolve();
-			}).catch(function () {
-				reject();
+			}).catch(function (err) {
+				_this5.page--;
+				reject(err);
 			});
 
 			if (_this5.table.options.persistence && _this5.table.modExists("persistence", true) && _this5.table.modules.persistence.config.page) {

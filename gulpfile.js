@@ -144,9 +144,11 @@ function modules(){
 
     var core = ["layout.js", "localize.js", "comms.js"];
 
+    var isTestFile = (file) => file.indexOf('.spec.js') !== -1;
+
     files.forEach(function(file, index){
 
-        if(!core.includes(file)){
+        if(!core.includes(file) && !isTestFile(file)){
             return gulp.src('src/js/modules/' + file)
             .pipe(insert.prepend(version + "\n"))
             .pipe(include())

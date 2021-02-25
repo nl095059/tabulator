@@ -6706,7 +6706,7 @@ DataManager.prototype.getResults = function () {
 	var _this30 = this;
 
 	this.table.overlay.showLoader();
-	return new Promise(function (resolve) {
+	return new Promise(function (resolve, reject) {
 		var viewParams = _this30.getViewParams();
 		_this30.dataSource.getResults(viewParams).then(function (data) {
 			var left = _this30.table.rowManager.scrollLeft;
@@ -6724,6 +6724,7 @@ DataManager.prototype.getResults = function () {
 				_this30.table.options.dataSource.onError.call(_this30, err);
 			}
 			_this30.table.overlay.showError();
+			reject(err);
 		});
 	});
 };
@@ -20254,6 +20255,7 @@ Page.prototype.setPage = function (page) {
 	}
 
 	return new Promise(function (resolve, reject) {
+		var oldPage = _this87.page;
 
 		page = parseInt(page);
 
@@ -20261,8 +20263,9 @@ Page.prototype.setPage = function (page) {
 			_this87.page = page;
 			_this87.trigger().then(function () {
 				resolve();
-			}).catch(function () {
-				reject();
+			}).catch(function (err) {
+				_this87.page = oldPage;
+				reject(err);
 			});
 
 			if (self.table.options.persistence && self.table.modExists("persistence", true) && self.table.modules.persistence.config.page) {
@@ -20389,8 +20392,9 @@ Page.prototype.previousPage = function () {
 			_this89.page--;
 			_this89.trigger().then(function () {
 				resolve();
-			}).catch(function () {
-				reject();
+			}).catch(function (err) {
+				_this89.page++;
+				reject(err);
 			});
 
 			if (_this89.table.options.persistence && _this89.table.modExists("persistence", true) && _this89.table.modules.persistence.config.page) {
@@ -20412,8 +20416,9 @@ Page.prototype.nextPage = function () {
 			_this90.page++;
 			_this90.trigger().then(function () {
 				resolve();
-			}).catch(function () {
-				reject();
+			}).catch(function (err) {
+				_this90.page--;
+				reject(err);
 			});
 
 			if (_this90.table.options.persistence && _this90.table.modExists("persistence", true) && _this90.table.modules.persistence.config.page) {

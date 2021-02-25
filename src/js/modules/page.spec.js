@@ -167,9 +167,10 @@ describe('Pagination', () => {
 
     describe('Set page', () => {
         var pageMod;
+        var tabulator;
 
         beforeEach(() => {
-            var tabulator = createTable({
+            tabulator = createTable({
                 paginationButtonCount: 5
             });
             pageMod = tabulator.modules.page;
@@ -203,6 +204,98 @@ describe('Pagination', () => {
             expect(pageMod.page).toEqual(9);
         });
 
+        describe('exception handling', () => {
+
+            const setupResultsRejection = () => {
+                tabulator.dataManager.getResults.mockImplementation(() => {
+                    return new Promise((resolve, reject) => reject('error reason'));
+                });
+            };
+
+            test('does not move to first on exception', async() => {
+                pageMod.setMaxPage(10);
+                await pageMod.setPage(5);
+
+                setupResultsRejection();
+
+                try {
+                    await pageMod.setPage('first');
+                } catch (error) {
+                    expect(error).toEqual('error reason');
+                }
+                expect(pageMod.page).toEqual(5);
+            });
+
+            test('does not move to last on exception', async() => {
+                pageMod.setMaxPage(10);
+                await pageMod.setPage(1);
+
+                setupResultsRejection();
+
+                try {
+                    await pageMod.setPage('last');
+                } catch (error) {
+                    expect(error).toEqual('error reason');
+                }
+                expect(pageMod.page).toEqual(1);
+            });
+
+            test('does not move to next on exception using text', async() => {
+                pageMod.setMaxPage(10);
+                await pageMod.setPage(1);
+
+                setupResultsRejection();
+
+                try {
+                    await pageMod.setPage('next');
+                } catch (error) {
+                    expect(error).toEqual('error reason');
+                }
+                expect(pageMod.page).toEqual(1);
+            });
+
+            test('does not move to next on exception using a number', async() => {
+                pageMod.setMaxPage(10);
+                await pageMod.setPage(1);
+
+                setupResultsRejection();
+
+                try {
+                    await pageMod.setPage(2);
+                } catch (error) {
+                    expect(error).toEqual('error reason');
+                }
+                expect(pageMod.page).toEqual(1);
+            });
+
+            test('does not move to previous on exception using text', async() => {
+                pageMod.setMaxPage(10);
+                await pageMod.setPage(2);
+
+                setupResultsRejection();
+
+                try {
+                    await pageMod.setPage('prev');
+                } catch (error) {
+                    expect(error).toEqual('error reason');
+                }
+                expect(pageMod.page).toEqual(2);
+            });
+
+            test('does not move to previous on exception using a number', async() => {
+                pageMod.setMaxPage(10);
+                await pageMod.setPage(2);
+
+                setupResultsRejection();
+
+                try {
+                    await pageMod.setPage(1);
+                } catch (error) {
+                    expect(error).toEqual('error reason');
+                }
+                expect(pageMod.page).toEqual(2);
+            });
+        });
     });
 
 
