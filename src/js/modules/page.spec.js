@@ -179,38 +179,50 @@ describe('Pagination', () => {
             });
         });
 
-        test('to first', () => {
-            pageMod.setPage('first');
-            expect(pageMod.page).toEqual(1);
-        });
+        describe('successful navigation', ()=> {
+            test('to first', () => {
+                pageMod.setPage('first');
+                expect(pageMod.page).toEqual(1);
+            });
+    
+            test('to last', () => {
+                pageMod.setMaxPage(10);
+                pageMod.setPage('last');
+                expect(pageMod.page).toEqual(10);
+            });
+    
+            test('to next', () => {
+                pageMod.setMaxPage(10);
+                pageMod.setPage('next');
+                expect(pageMod.page).toEqual(2);
+            });
+    
+            test('to previous', () => {
+                pageMod.setMaxPage(10);
+                pageMod.setPage(10);
+                expect(pageMod.page).toEqual(10);
+                pageMod.setPage('prev');
+                expect(pageMod.page).toEqual(9);
+            });
+    
+        })
 
-        test('to last', () => {
-            pageMod.setMaxPage(10);
-            pageMod.setPage('last');
-            expect(pageMod.page).toEqual(10);
-        });
+        describe('failed navigation', () => {
 
-        test('to next', () => {
-            pageMod.setMaxPage(10);
-            pageMod.setPage('next');
-            expect(pageMod.page).toEqual(2);
-        });
-
-        test('to previous', () => {
-            pageMod.setMaxPage(10);
-            pageMod.setPage(10);
-            expect(pageMod.page).toEqual(10);
-            pageMod.setPage('prev');
-            expect(pageMod.page).toEqual(9);
-        });
-
-        describe('exception handling', () => {
-
+            const setupResultsResolve = () => {
+                tabulator.dataManager.getResults.mockImplementation(() => {
+                    return new Promise((resolve, reject) => resolve());
+                });
+            };
             const setupResultsRejection = () => {
                 tabulator.dataManager.getResults.mockImplementation(() => {
                     return new Promise((resolve, reject) => reject('error reason'));
                 });
             };
+
+            beforeEach(() => {
+                setupResultsResolve();
+            });
 
             test('does not move to first on exception', async() => {
                 pageMod.setMaxPage(10);
@@ -294,6 +306,81 @@ describe('Pagination', () => {
                     expect(error).toEqual('error reason');
                 }
                 expect(pageMod.page).toEqual(2);
+            });
+
+            describe('with retry', () => {
+                test('navigates to first page on retry', async() => {
+                    pageMod.setMaxPage(10);
+                    await pageMod.setPage(5);
+    
+                    setupResultsRejection();
+    
+                    try {
+                        await pageMod.setPage('first');
+                    } catch (error) {
+                        expect(error).toEqual('error reason');
+                    }
+
+                    setupResultsResolve();
+
+                    await pageMod.retryNavigation();
+                    expect(pageMod.page).toEqual(1);
+                });
+    
+                test('navigates to last page on retry', async() => {
+                    pageMod.setMaxPage(10);
+                    await pageMod.setPage(1);
+    
+                    setupResultsRejection();
+    
+                    try {
+                        await pageMod.setPage('last');
+                    } catch (error) {
+                        expect(error).toEqual('error reason');
+                    }
+
+                    setupResultsResolve();
+
+                    await pageMod.retryNavigation();
+                    expect(pageMod.page).toEqual(10);
+                });
+    
+                test('navigates to next page on retry', async() => {
+                    pageMod.setMaxPage(10);
+                    await pageMod.setPage(1);
+    
+                    setupResultsRejection();
+    
+                    try {
+                        await pageMod.setPage('next');
+                    } catch (error) {
+                        expect(error).toEqual('error reason');
+                    }
+                    
+                    setupResultsResolve();
+
+                    await pageMod.retryNavigation();
+                    expect(pageMod.page).toEqual(2);
+                });
+    
+
+                test('navigates to previous page on retry', async() => {
+                    pageMod.setMaxPage(10);
+                    await pageMod.setPage(2);
+    
+                    setupResultsRejection();
+    
+                    try {
+                        await pageMod.setPage('prev');
+                    } catch (error) {
+                        expect(error).toEqual('error reason');
+                    }
+
+                    setupResultsResolve();
+
+                    await pageMod.retryNavigation();
+                    expect(pageMod.page).toEqual(1);
+                });
             });
         });
     });

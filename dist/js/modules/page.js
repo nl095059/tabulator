@@ -12,6 +12,8 @@ var Page = function Page(table) {
 	this.paginationButtonCount = 5;
 	this.max = 1;
 
+	this.requestedPage = 0;
+
 	this.displayIndex = 0; //index in display pipeline
 
 	this.initialLoad = true;
@@ -310,9 +312,10 @@ Page.prototype.setPage = function (page) {
 		var oldPage = _this2.page;
 
 		page = parseInt(page);
+		_this2.requestedPage = page;
 
 		if (page > 0 && page <= _this2.max) {
-			_this2.page = page;
+			_this2.page = _this2.requestedPage;
 			_this2.trigger().then(function () {
 				resolve();
 			}).catch(function (err) {
@@ -328,6 +331,10 @@ Page.prototype.setPage = function (page) {
 			reject();
 		}
 	});
+};
+
+Page.prototype.retryNavigation = function () {
+	return this.setPage(this.requestedPage);
 };
 
 Page.prototype.setPageToRow = function (row) {
@@ -439,13 +446,16 @@ Page.prototype._generatePageButton = function (page) {
 Page.prototype.previousPage = function () {
 	var _this4 = this;
 
+	var oldPage = this.page;
+	this.requestedPage = oldPage - 1;
+
 	return new Promise(function (resolve, reject) {
 		if (_this4.page > 1) {
-			_this4.page--;
+			_this4.page = _this4.requestedPage;
 			_this4.trigger().then(function () {
 				resolve();
 			}).catch(function (err) {
-				_this4.page++;
+				_this4.page = oldPage;
 				reject(err);
 			});
 
@@ -463,13 +473,16 @@ Page.prototype.previousPage = function () {
 Page.prototype.nextPage = function () {
 	var _this5 = this;
 
+	var oldPage = this.page;
+	this.requestedPage = oldPage + 1;
+
 	return new Promise(function (resolve, reject) {
 		if (_this5.page < _this5.max) {
-			_this5.page++;
+			_this5.page = _this5.requestedPage;
 			_this5.trigger().then(function () {
 				resolve();
 			}).catch(function (err) {
-				_this5.page--;
+				_this5.page = oldPage;
 				reject(err);
 			});
 

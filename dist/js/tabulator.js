@@ -19970,6 +19970,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		this.paginationButtonCount = 5;
 		this.max = 1;
 
+		this.requestedPage = 0;
+
 		this.displayIndex = 0; //index in display pipeline
 
 		this.initialLoad = true;
@@ -20268,9 +20270,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 			var oldPage = _this87.page;
 
 			page = parseInt(page);
+			_this87.requestedPage = page;
 
 			if (page > 0 && page <= _this87.max) {
-				_this87.page = page;
+				_this87.page = _this87.requestedPage;
 				_this87.trigger().then(function () {
 					resolve();
 				}).catch(function (err) {
@@ -20286,6 +20289,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				reject();
 			}
 		});
+	};
+
+	Page.prototype.retryNavigation = function () {
+		return this.setPage(this.requestedPage);
 	};
 
 	Page.prototype.setPageToRow = function (row) {
@@ -20397,13 +20404,16 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	Page.prototype.previousPage = function () {
 		var _this89 = this;
 
+		var oldPage = this.page;
+		this.requestedPage = oldPage - 1;
+
 		return new Promise(function (resolve, reject) {
 			if (_this89.page > 1) {
-				_this89.page--;
+				_this89.page = _this89.requestedPage;
 				_this89.trigger().then(function () {
 					resolve();
 				}).catch(function (err) {
-					_this89.page++;
+					_this89.page = oldPage;
 					reject(err);
 				});
 
@@ -20421,13 +20431,16 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	Page.prototype.nextPage = function () {
 		var _this90 = this;
 
+		var oldPage = this.page;
+		this.requestedPage = oldPage + 1;
+
 		return new Promise(function (resolve, reject) {
 			if (_this90.page < _this90.max) {
-				_this90.page++;
+				_this90.page = _this90.requestedPage;
 				_this90.trigger().then(function () {
 					resolve();
 				}).catch(function (err) {
-					_this90.page--;
+					_this90.page = oldPage;
 					reject(err);
 				});
 
