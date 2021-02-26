@@ -154,8 +154,8 @@ DataManager.prototype.getStatus = function (token) {
 		this.updatePageCount(status);
 
 	}).catch((err) => {
-		console.error('Cancelling polling ', err);
-		this.clearPoller();
+		// Don't cancel the polling as the data source may be temporarily unavailable
+		console.error('Error getting status ', err);
 	});
 };
 

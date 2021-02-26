@@ -6697,8 +6697,8 @@ DataManager.prototype.getStatus = function (token) {
 
 		_this29.updatePageCount(status);
 	}).catch(function (err) {
-		console.error('Cancelling polling ', err);
-		_this29.clearPoller();
+		// Don't cancel the polling as the data source may be temporarily unavailable
+		console.error('Error getting status ', err);
 	});
 };
 
