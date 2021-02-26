@@ -6705,6 +6705,10 @@ DataManager.prototype.getStatus = function (token) {
 DataManager.prototype.getResults = function () {
 	var _this30 = this;
 
+	if (this.table.options.dataSource.onPageUpdate) {
+		this.table.options.dataSource.onPageUpdate.call(this, null);
+	}
+
 	this.table.overlay.showLoader();
 	return new Promise(function (resolve) {
 		var viewParams = _this30.getViewParams();

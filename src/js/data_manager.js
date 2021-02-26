@@ -160,6 +160,10 @@ DataManager.prototype.getStatus = function (token) {
 };
 
 DataManager.prototype.getResults = function() {
+	if (this.table.options.dataSource.onPageUpdate) {
+		this.table.options.dataSource.onPageUpdate.call(this, null);
+	}
+
 	this.table.overlay.showLoader();
 	return new Promise((resolve) => {
 		var viewParams = this.getViewParams();
