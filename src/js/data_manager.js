@@ -181,6 +181,8 @@ DataManager.prototype.getResults = function() {
 				resolve();
 			})
 			.catch((err) => {
+				err.message = `Error retrieving results: ${err.message}`;				
+				
 				if (this.table.options.dataSource.onError) {
 					this.table.options.dataSource.onError.call(this, err);
 				}

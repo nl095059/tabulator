@@ -6724,6 +6724,8 @@ DataManager.prototype.getResults = function () {
 			}
 			resolve();
 		}).catch(function (err) {
+			err.message = 'Error retrieving results: ' + err.message;
+
 			if (_this30.table.options.dataSource.onError) {
 				_this30.table.options.dataSource.onError.call(_this30, err);
 			}
