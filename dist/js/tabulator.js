@@ -6577,9 +6577,6 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		if (!datasourceOptions.async) {
 			throw new Error('Object datasource requires mandatory async property');
 		}
-		// if (!datasourceOptions.async.initializeQuery) {
-		// 	throw new Error('Object datasource has not been passed an initQuery callback');
-		// }
 		if (!datasourceOptions.async.getStatus) {
 			throw new Error('Object datasource has not been passed a getStatus callback');
 		}
@@ -6708,8 +6705,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 			_this29.updatePageCount(status);
 		}).catch(function (err) {
-			console.error('Cancelling polling ', err);
-			_this29.clearPoller();
+			// Don't cancel the polling as the data source may be temporarily unavailable
+			console.error('Error getting status ', err);
 		});
 	};
 
