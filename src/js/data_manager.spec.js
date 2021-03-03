@@ -101,6 +101,7 @@ describe('Datamanager', () => {
             let getResults = jest.fn();
             let getStatusHTML = jest.fn();
             let onError = jest.fn();
+            let onFinished = jest.fn();
 
             function createTable(options) {
                 var tabulator = new Tabulator({}, Object.assign({
@@ -112,6 +113,7 @@ describe('Datamanager', () => {
                             getResults,
                             statusPollInterval: 0
                         },
+                        onFinished,
                         onError,
                         getStatusHTML,
                         sorting: true,

@@ -6704,7 +6704,7 @@ DataManager.prototype.getResults = function () {
 	var _this30 = this;
 
 	this.table.overlay.showLoader();
-	return new Promise(function (resolve) {
+	return new Promise(function (resolve, reject) {
 		var viewParams = _this30.getViewParams();
 		_this30.dataSource.getResults(viewParams).then(function (data) {
 			var left = _this30.table.rowManager.scrollLeft;
@@ -6722,6 +6722,7 @@ DataManager.prototype.getResults = function () {
 				_this30.table.options.dataSource.onError.call(_this30, err);
 			}
 			_this30.table.overlay.showError();
+			reject(err);
 		});
 	});
 };

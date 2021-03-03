@@ -6714,7 +6714,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		var _this30 = this;
 
 		this.table.overlay.showLoader();
-		return new Promise(function (resolve) {
+		return new Promise(function (resolve, reject) {
 			var viewParams = _this30.getViewParams();
 			_this30.dataSource.getResults(viewParams).then(function (data) {
 				var left = _this30.table.rowManager.scrollLeft;
@@ -6732,6 +6732,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 					_this30.table.options.dataSource.onError.call(_this30, err);
 				}
 				_this30.table.overlay.showError();
+				reject(err);
 			});
 		});
 	};
@@ -19967,6 +19968,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		this.paginationButtonCount = 5;
 		this.max = 1;
 
+		this.requestedPage = 0;
+
 		this.displayIndex = 0; //index in display pipeline
 
 		this.initialLoad = true;
@@ -20262,15 +20265,18 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 		}
 
 		return new Promise(function (resolve, reject) {
+			var oldPage = _this87.page;
 
 			page = parseInt(page);
+			_this87.requestedPage = page;
 
 			if (page > 0 && page <= _this87.max) {
-				_this87.page = page;
+				_this87.page = _this87.requestedPage;
 				_this87.trigger().then(function () {
 					resolve();
-				}).catch(function () {
-					reject();
+				}).catch(function (err) {
+					_this87.page = oldPage;
+					reject(err);
 				});
 
 				if (self.table.options.persistence && self.table.modExists("persistence", true) && self.table.modules.persistence.config.page) {
@@ -20281,6 +20287,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				reject();
 			}
 		});
+	};
+
+	Page.prototype.retryNavigation = function () {
+		return this.setPage(this.requestedPage);
 	};
 
 	Page.prototype.setPageToRow = function (row) {
@@ -20392,13 +20402,17 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	Page.prototype.previousPage = function () {
 		var _this89 = this;
 
+		var oldPage = this.page;
+		this.requestedPage = oldPage - 1;
+
 		return new Promise(function (resolve, reject) {
 			if (_this89.page > 1) {
-				_this89.page--;
+				_this89.page = _this89.requestedPage;
 				_this89.trigger().then(function () {
 					resolve();
-				}).catch(function () {
-					reject();
+				}).catch(function (err) {
+					_this89.page = oldPage;
+					reject(err);
 				});
 
 				if (_this89.table.options.persistence && _this89.table.modExists("persistence", true) && _this89.table.modules.persistence.config.page) {
@@ -20415,13 +20429,17 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	Page.prototype.nextPage = function () {
 		var _this90 = this;
 
+		var oldPage = this.page;
+		this.requestedPage = oldPage + 1;
+
 		return new Promise(function (resolve, reject) {
 			if (_this90.page < _this90.max) {
-				_this90.page++;
+				_this90.page = _this90.requestedPage;
 				_this90.trigger().then(function () {
 					resolve();
-				}).catch(function () {
-					reject();
+				}).catch(function (err) {
+					_this90.page = oldPage;
+					reject(err);
 				});
 
 				if (_this90.table.options.persistence && _this90.table.modExists("persistence", true) && _this90.table.modules.persistence.config.page) {

@@ -159,7 +159,7 @@ DataManager.prototype.getStatus = function () {
 
 DataManager.prototype.getResults = function() {
 	this.table.overlay.showLoader();
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		var viewParams = this.getViewParams();
 		this.dataSource.getResults(viewParams)
 			.then((data) => {
@@ -179,6 +179,7 @@ DataManager.prototype.getResults = function() {
 					this.table.options.dataSource.onError.call(this, err);
 				}
 				this.table.overlay.showError();
+				reject(err);
 			});
 	});
 };

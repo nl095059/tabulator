@@ -10,6 +10,8 @@ var Page = function(table){
 	this.paginationButtonCount = 5;
 	this.max = 1;
 
+	this.requestedPage = 0;
+
 	this.displayIndex = 0; //index in display pipeline
 
 	this.initialLoad = true;
@@ -302,17 +304,20 @@ Page.prototype.setPage = function(page){
 	}
 
 	return new Promise((resolve, reject)=>{
+		var oldPage = this.page;
 
 		page = parseInt(page);
+		this.requestedPage = page;
 
 		if(page > 0 && page <= this.max){
-			this.page = page;
+			this.page = this.requestedPage;
 			this.trigger()
 			.then(()=>{
 				resolve();
 			})
-			.catch(()=>{
-				reject();
+			.catch((err)=>{
+				this.page = oldPage;
+				reject(err);
 			});
 
 			if(self.table.options.persistence && self.table.modExists("persistence", true) && self.table.modules.persistence.config.page){
@@ -324,6 +329,10 @@ Page.prototype.setPage = function(page){
 			reject();
 		}
 	});
+};
+
+Page.prototype.retryNavigation = function() {
+	return this.setPage(this.requestedPage);
 };
 
 Page.prototype.setPageToRow = function(row){
@@ -435,15 +444,19 @@ Page.prototype._generatePageButton = function(page){
 
 //previous page
 Page.prototype.previousPage = function(){
+	let oldPage = this.page;
+	this.requestedPage = oldPage-1;
+
 	return new Promise((resolve, reject)=>{
 		if(this.page > 1){
-			this.page--;
+			this.page = this.requestedPage;
 			this.trigger()
 			.then(()=>{
 				resolve();
 			})
-			.catch(()=>{
-				reject();
+			.catch((err)=>{
+				this.page = oldPage;
+				reject(err);
 			});
 
 			if(this.table.options.persistence && this.table.modExists("persistence", true) && this.table.modules.persistence.config.page){
@@ -459,15 +472,19 @@ Page.prototype.previousPage = function(){
 
 //next page
 Page.prototype.nextPage = function(){
+	let oldPage = this.page;
+	this.requestedPage = oldPage+1;
+
 	return new Promise((resolve, reject)=>{
 		if(this.page < this.max){
-			this.page++;
+			this.page = this.requestedPage;
 			this.trigger()
 			.then(()=>{
 				resolve();
 			})
-			.catch(()=>{
-				reject();
+			.catch((err)=>{
+				this.page = oldPage;
+				reject(err);
 			});
 
 			if(this.table.options.persistence && this.table.modExists("persistence", true) && this.table.modules.persistence.config.page){
