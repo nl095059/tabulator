@@ -6713,6 +6713,10 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 	DataManager.prototype.getResults = function () {
 		var _this30 = this;
 
+		if (this.table.options.dataSource.onPageUpdate) {
+			this.table.options.dataSource.onPageUpdate.call(this, null);
+		}
+
 		this.table.overlay.showLoader();
 		return new Promise(function (resolve, reject) {
 			var viewParams = _this30.getViewParams();
@@ -6728,6 +6732,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 				}
 				resolve();
 			}).catch(function (err) {
+				err.message = 'Error retrieving results: ' + err.message;
+
 				if (_this30.table.options.dataSource.onError) {
 					_this30.table.options.dataSource.onError.call(_this30, err);
 				}

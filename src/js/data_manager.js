@@ -158,6 +158,10 @@ DataManager.prototype.getStatus = function () {
 };
 
 DataManager.prototype.getResults = function() {
+	if (this.table.options.dataSource.onPageUpdate) {
+		this.table.options.dataSource.onPageUpdate.call(this, null);
+	}
+
 	this.table.overlay.showLoader();
 	return new Promise((resolve, reject) => {
 		var viewParams = this.getViewParams();
@@ -175,6 +179,8 @@ DataManager.prototype.getResults = function() {
 				resolve();
 			})
 			.catch((err) => {
+				err.message = `Error retrieving results: ${err.message}`;				
+				
 				if (this.table.options.dataSource.onError) {
 					this.table.options.dataSource.onError.call(this, err);
 				}
